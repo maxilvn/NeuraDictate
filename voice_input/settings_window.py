@@ -238,6 +238,20 @@ status_lbl.pack(side="left", padx=(5, 0))
 hotkey_lbl = tk.Label(status_row, text="", font=(MONO, 10), bg=BG, fg=FG3)
 hotkey_lbl.pack(side="right")
 
+# Start button (shown when backend is not running)
+def _start_backend():
+    start_script = str(project_dir.parent / "start.py")
+    env = dict(__import__("os").environ, NEURADICTATE_HEADLESS="1")
+    subprocess.Popen([sys.executable, start_script], env=env,
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                      start_new_session=True)
+    start_btn.c.pack_forget()
+    status_lbl.config(text="Starting...")
+
+start_btn = RBtn(status_row, "\\u25B6  Start", _start_backend,
+                  bg_color=ACCENT, fg_color="white", hover="#0070E0",
+                  w=80, h=22, r=11, font_t=(FONT, 9))
+
 sep(root)
 
 content_area = tk.Frame(root, bg=BG)
@@ -749,12 +763,29 @@ def refresh(sched=True):
     else:
         lbl, dot = detail or "Ready", FG2
 
-    if state == "transcribing":
-        status_dot.config(text="N", fg=FG, font=(FONT, 9, "bold"))
+    # Check if backend is running (status updated within last 10s)
+    import time as _time
+    backend_alive = False
+    try:
+        if status_path.exists():
+            age = _time.time() - status_path.stat().st_mtime
+            backend_alive = age < 10
+    except Exception:
+        pass
+
+    if not backend_alive:
+        status_dot.config(text="\\u25CF", fg=RED, font=(FONT, 8))
+        status_lbl.config(text="Stopped")
+        start_btn.c.pack(side="right")
+        hotkey_lbl.config(text="")
     else:
-        status_dot.config(text="\\u25CF", fg=dot, font=(FONT, 8))
-    status_lbl.config(text=lbl)
-    hotkey_lbl.config(text=hk)
+        start_btn.c.pack_forget()
+        if state == "transcribing":
+            status_dot.config(text="N", fg=FG, font=(FONT, 9, "bold"))
+        else:
+            status_dot.config(text="\\u25CF", fg=dot, font=(FONT, 8))
+        status_lbl.config(text=lbl)
+        hotkey_lbl.config(text=hk)
 
     if current_tab.get() == "history":
         build_history()
