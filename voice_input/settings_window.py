@@ -593,16 +593,19 @@ def refresh(sched=True):
     elif state == "loading":
         lbl, dot = detail, ACCENT
     elif state == "listening":
-        lbl, dot = "Listening", RED
+        lbl, dot = "Listening", GREEN
     elif state == "transcribing":
-        lbl, dot = "Transcribing...", ORANGE
+        lbl, dot = "Transcribing...", FG
     elif state in ("done", "hidden"):
         lbl = "Ready" if detail in ("Ready", "Settings saved", "Starting", "") else detail
         dot = GREEN
     else:
         lbl, dot = detail or "Ready", FG2
 
-    status_dot.config(fg=dot)
+    if state == "transcribing":
+        status_dot.config(text="N", fg=FG, font=(FONT, 9, "bold"))
+    else:
+        status_dot.config(text="\\u25CF", fg=dot, font=(FONT, 8))
     status_lbl.config(text=lbl)
     hotkey_lbl.config(text=hk)
 

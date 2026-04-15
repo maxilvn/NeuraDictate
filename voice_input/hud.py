@@ -14,9 +14,9 @@ class HudState:
 
 # Subtle, muted colors
 _COLORS = {
-    HudState.LISTENING: ("#FFFFFF", "#FF3B30"),     # White bg, red text
-    HudState.TRANSCRIBING: ("#FFFFFF", "#8E8E93"),  # White bg, gray text
-    HudState.DONE: ("#FFFFFF", "#34C759"),           # White bg, green text
+    HudState.LISTENING: ("#FFFFFF", "#1C1C1E"),     # White bg, black text
+    HudState.TRANSCRIBING: ("#FFFFFF", "#1C1C1E"),  # White bg, black text
+    HudState.DONE: ("#FFFFFF", "#1C1C1E"),           # White bg, black text
     HudState.ERROR: ("#FFFFFF", "#FF3B30"),          # White bg, red text
 }
 
@@ -29,8 +29,8 @@ _LABELS = {
 
 # Small dot indicators
 _DOTS = {
-    HudState.LISTENING: "#FF3B30",
-    HudState.TRANSCRIBING: "#FF9500",
+    HudState.LISTENING: "#34C759",
+    HudState.TRANSCRIBING: "#1C1C1E",
     HudState.DONE: "#34C759",
     HudState.ERROR: "#FF3B30",
 }
