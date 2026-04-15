@@ -250,10 +250,11 @@ _init = [False]
 
 def build_cfg():
     rev_hk = {{v: k for k, v in hotkeys.items()}}
+    rev_lg = dict(zip(lg_display, lg_keys))
     return {{
         "hotkey": rev_hk.get(hk_pill.get(), hk_pill.get()),
         "model": md_pill.get(),
-        "language": "auto",
+        "language": rev_lg.get(lg_pill.get(), "auto"),
         "auto_paste": paste_toggle.get(),
     }}
 
@@ -327,8 +328,9 @@ class PillSelect:
         self.c.pack(**kw)
 
 class Toggle:
-    \"\"\"Canvas-based oval toggle switch.\"\"\"
-    W, H = 34, 18
+    \"\"\"Canvas-based oval toggle switch using ovals for perfect roundness.\"\"\"
+    W, H = 40, 22
+    R = 11  # half height = perfect circle ends
 
     def __init__(self, parent, label, current, on_change=None):
         self._on = current
@@ -344,9 +346,16 @@ class Toggle:
     def _draw(self):
         self.c.delete("all")
         bg = FG2 if self._on else SEP
-        rr(self.c, 0, 0, self.W, self.H, self.H//2, fill=bg, outline="")
-        cx = self.W - 9 if self._on else 9
-        self.c.create_oval(cx-6, 3, cx+6, self.H-3, fill="white", outline="")
+        r = self.R
+        # Left cap (semicircle)
+        self.c.create_oval(0, 0, r*2, r*2, fill=bg, outline="")
+        # Right cap (semicircle)
+        self.c.create_oval(self.W-r*2, 0, self.W, r*2, fill=bg, outline="")
+        # Middle rect
+        self.c.create_rectangle(r, 0, self.W-r, self.H, fill=bg, outline="")
+        # Thumb circle
+        cx = self.W - r if self._on else r
+        self.c.create_oval(cx-8, 3, cx+8, self.H-3, fill="white", outline="")
 
     def _toggle(self, _e=None):
         self._on = not self._on
@@ -392,6 +401,14 @@ def refresh_model_dropdown():
         if dl:
             no_models_lbl.pack_forget()
 
+# Language
+field_label(sf, "Language")
+lg_display = ["Auto (Deutsch)", "Deutsch", "English", "Français", "Español"]
+lg_keys = ["auto", "de", "en", "fr", "es"]
+lg_map = dict(zip(lg_keys, lg_display))
+lg_cur = lg_map.get(cfg.get("language", "auto"), "Auto (Deutsch)")
+lg_pill = PillSelect(sf, lg_display, lg_cur, on_change=schedule_save)
+lg_pill.pack(anchor="w", padx=20, pady=(0, 4))
 sep(sf)
 
 # Toggles
