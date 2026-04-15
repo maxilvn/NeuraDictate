@@ -53,24 +53,27 @@ def ensure_deps():
 
 if __name__ == "__main__":
     # --- Headless re-exec: detach from any visible terminal ---------------
-    if sys.platform == "darwin":
+    _HEADLESS = os.environ.get("NEURADICTATE_HEADLESS") == "1"
+    if not _HEADLESS and sys.platform == "darwin":
         if sys.stdout and sys.stdout.isatty():
-            devnull = open(os.devnull, "w")
+            env = dict(os.environ, NEURADICTATE_HEADLESS="1")
             subprocess.Popen(
                 [sys.executable, __file__],
-                stdout=devnull,
-                stderr=devnull,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 start_new_session=True,
+                env=env,
             )
             sys.exit(0)
-    elif sys.platform == "win32":
+    elif not _HEADLESS and sys.platform == "win32":
         _exe = os.path.basename(sys.executable).lower()
         if _exe == "python.exe" and sys.stdout and sys.stdout.isatty():
             _dir = os.path.dirname(sys.executable)
             _pythonw = os.path.join(_dir, "pythonw.exe")
             if not os.path.isfile(_pythonw):
-                _pythonw = sys.executable  # fallback
+                _pythonw = sys.executable
+            env = dict(os.environ, NEURADICTATE_HEADLESS="1")
             DETACHED_PROCESS = 0x00000008
             subprocess.Popen(
                 [_pythonw, __file__],
@@ -78,6 +81,7 @@ if __name__ == "__main__":
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 creationflags=DETACHED_PROCESS,
+                env=env,
             )
             sys.exit(0)
 
