@@ -89,8 +89,25 @@ if __name__ == "__main__":
     if sys.stdout is None:
         sys.stdout = io.StringIO()
     if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w")
+        sys.stderr = io.StringIO()
 
-    ensure_deps()
-    from voice_input.app import main
-    main()
+    try:
+        ensure_deps()
+        from voice_input.app import main
+        main()
+    except Exception as e:
+        # Write error to a visible file so user can diagnose
+        err_path = os.path.join(os.path.dirname(__file__), "ERROR.txt")
+        with open(err_path, "w") as f:
+            import traceback
+            f.write(f"NeuraDictate failed to start:\n\n{traceback.format_exc()}\n")
+            f.write(f"\nPython: {sys.executable}\nPlatform: {sys.platform}\n")
+        # Also try a system notification on Windows
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    0, f"NeuraDictate failed to start.\nSee ERROR.txt for details.",
+                    "NeuraDictate Error", 0x10)
+            except Exception:
+                pass
