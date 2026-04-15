@@ -244,27 +244,25 @@ class _MacHud:
                     0.05, True, _breathe)
 
             elif state == HudState.TRANSCRIBING and self._icon_view:
-                # Slow gentle size pulse
-                self._pulse_growing = True
-                self._pulse_size = float(icon_s)
+                # Opacity pulse — fades in and out
+                self._pulse_growing = False
+                self._pulse_alpha = 1.0
                 def _pulse(_):
                     if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
                     if self._pulse_growing:
-                        self._pulse_size += 0.15
-                        if self._pulse_size >= icon_s + 3:
+                        self._pulse_alpha += 0.06
+                        if self._pulse_alpha >= 1.0:
+                            self._pulse_alpha = 1.0
                             self._pulse_growing = False
                     else:
-                        self._pulse_size -= 0.15
-                        if self._pulse_size <= icon_s - 3:
+                        self._pulse_alpha -= 0.06
+                        if self._pulse_alpha <= 0.15:
+                            self._pulse_alpha = 0.15
                             self._pulse_growing = True
-                    s = self._pulse_size
-                    iy = (PILL_HEIGHT - s) / 2
-                    ix = content_x - (s - icon_s) / 2
-                    self._icon_view.setFrame_(((ix, iy), (s, s)))
-                    self._icon_view.setNeedsDisplay_(True)
+                    self._icon_view.setAlphaValue_(self._pulse_alpha)
                 self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
-                    0.03, True, _pulse)
+                    0.04, True, _pulse)
 
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
