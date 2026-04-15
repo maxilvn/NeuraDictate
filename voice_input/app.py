@@ -79,13 +79,18 @@ class VoiceInputApp:
         self._open_control_panel()
 
         # Run tray in main thread (blocking)
-        self._tray = TrayApp(
-            on_toggle=self._toggle_active,
-            on_settings=self._open_control_panel,
-            on_quit=self._quit,
-            is_active=lambda: self._active,
-        )
-        self._tray.run()
+        log.info("Starting tray icon...")
+        try:
+            self._tray = TrayApp(
+                on_toggle=self._toggle_active,
+                on_settings=self._open_control_panel,
+                on_quit=self._quit,
+                is_active=lambda: self._active,
+            )
+            log.info("Tray created, running...")
+            self._tray.run()
+        except Exception:
+            log.exception("Tray failed")
 
     def _on_key_press(self) -> None:
         if not self._active:
