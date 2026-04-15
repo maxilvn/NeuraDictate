@@ -13,7 +13,7 @@ from .hotkey import HotkeyListener
 from .hud import HudOverlay, HudState
 from .recorder import Recorder
 from .settings_window import SettingsWindow
-from .transcriber import transcribe, unload_model, warm_up_model
+from .transcriber import transcribe, unload_model, warm_up_model, download_model, delete_model
 from .tray import TrayApp
 
 logging.basicConfig(

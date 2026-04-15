@@ -8,7 +8,7 @@ from pathlib import Path
 APP_NAME = "NeuraDictate"
 
 DEFAULT_CONFIG = {
-    "hotkey": "Key.alt_r",
+    "hotkey": "fn" if sys.platform == "darwin" else "Key.alt_r",
     "model": "small",
     "language": "auto",
     "auto_paste": True,
@@ -90,6 +90,8 @@ def _model_dir() -> Path:
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
+MODULE_DIR = Path(__file__).resolve().parent
 
 CONFIG_PATH = _config_dir() / "config.json"
 CACHE_DIR = _cache_dir()

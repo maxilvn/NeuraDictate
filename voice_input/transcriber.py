@@ -130,6 +130,38 @@ def transcribe(wav_path: str, cfg: dict) -> str:
     return text
 
 
+def download_model(model_name: str) -> bool:
+    """Download a model without loading it for transcription."""
+    if _is_model_downloaded(model_name):
+        return True
+    try:
+        _write_download_status(model_name, "downloading")
+        log.info("Downloading model %s...", model_name)
+        from faster_whisper import WhisperModel
+        WhisperModel(model_name, device="cpu", compute_type="int8",
+                     download_root=str(config.MODEL_DIR))
+        _write_download_status(model_name, "ready")
+        log.info("Model %s downloaded successfully", model_name)
+        return True
+    except Exception:
+        log.exception("Failed to download model %s", model_name)
+        _write_download_status(model_name, "ready")
+        return False
+
+
+def delete_model(model_name: str) -> bool:
+    """Delete a downloaded model from disk."""
+    import shutil
+    if not config.MODEL_DIR.exists():
+        return False
+    for entry in config.MODEL_DIR.iterdir():
+        if entry.is_dir() and model_name in entry.name:
+            shutil.rmtree(entry)
+            log.info("Deleted model %s", model_name)
+            return True
+    return False
+
+
 def unload_model():
     global _model_instance, _model_name
     _model_instance = None

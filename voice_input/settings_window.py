@@ -53,11 +53,15 @@ def _build_settings_script(cfg: dict) -> str:
     is_mac_json = "True" if sys.platform == "darwin" else "False"
     model_info_json = json.dumps(config.MODEL_INFO)
     model_dir_json = json.dumps(str(config.MODEL_DIR))
+    project_dir_json = json.dumps(str(config.MODULE_DIR))
 
     return textwrap.dedent(
         f"""\
         import json
         import pathlib
+        import subprocess
+        import sys
+        import threading
         import tkinter as tk
         from tkinter import scrolledtext
 
@@ -74,31 +78,39 @@ def _build_settings_script(cfg: dict) -> str:
         is_mac = {is_mac_json}
         model_info = json.loads({model_info_json!r})
         model_dir = pathlib.Path(json.loads({model_dir_json!r}))
+        project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 
-        BG = "#161616"
-        PANEL = "#1E1E1E"
-        PANEL_ALT = "#252525"
-        FIELD_BG = "#2B2B2B"
-        FG = "#ECECEC"
-        MUTED = "#9A9A9A"
-        ACCENT = "#43A047"
-        BORDER = "#363636"
+        # ── Apple-like palette ──
+        BG       = "#1C1C1E"
+        SURFACE  = "#2C2C2E"
+        SURFACE2 = "#3A3A3C"
+        FG       = "#F5F5F7"
+        FG2      = "#A1A1A6"
+        ACCENT   = "#0A84FF"
+        GREEN    = "#30D158"
+        RED      = "#FF453A"
+        ORANGE   = "#FF9F0A"
+        BORDER   = "#38383A"
+        HOVER    = "#48484A"
+
+        FONT     = "SF Pro Display" if is_mac else "Segoe UI"
+        MONO     = "SF Mono" if is_mac else "Consolas"
 
         root = tk.Tk()
         root.title(app_name)
         root.configure(bg=BG)
         root.resizable(True, True)
-        root.minsize(560, 620)
+        root.minsize(520, 580)
         root.attributes("-topmost", True)
-        root.geometry("680x820")
+        root.geometry("600x720")
 
         root.update_idletasks()
-        w = root.winfo_width()
-        h = root.winfo_height()
+        w, h = root.winfo_width(), root.winfo_height()
         x = (root.winfo_screenwidth() - w) // 2
         y = (root.winfo_screenheight() - h) // 2
         root.geometry(f"{{w}}x{{h}}+{{x}}+{{y}}")
 
+        # ── Helpers ──
         def read_json(path, default):
             try:
                 return json.loads(path.read_text(encoding="utf-8"))
@@ -111,317 +123,137 @@ def _build_settings_script(cfg: dict) -> str:
             except Exception:
                 return default
 
-        def set_text(widget, value):
-            widget.config(state="normal")
-            widget.delete("1.0", "end")
-            widget.insert("1.0", value.strip())
-            widget.config(state="disabled")
-
         def get_downloaded():
-            downloaded = []
+            dl = []
             if model_dir.exists():
                 for name in models:
                     for entry in model_dir.iterdir():
                         if entry.is_dir() and name in entry.name:
-                            downloaded.append(name)
+                            dl.append(name)
                             break
-            return downloaded
+            return dl
 
-        downloaded = get_downloaded()
+        # ── Tab bar ──
+        tab_bar = tk.Frame(root, bg=BG)
+        tab_bar.pack(fill="x", padx=24, pady=(20, 0))
 
-        model_display = {{}}
-        for m in models:
-            label = m
-            if m in downloaded:
-                label += "  [downloaded]"
-            if model_info.get(m, {{}}).get("recommended"):
-                label += "  (recommended)"
-            model_display[m] = label
+        current_tab = tk.StringVar(value="settings")
+        tab_frames = {{}}
+        tab_buttons = {{}}
 
-        title = tk.Label(
-            root,
-            text=app_name,
-            font=("Helvetica", 20, "bold"),
-            bg=BG,
-            fg=FG,
-        )
-        title.pack(anchor="w", padx=20, pady=(18, 4))
+        def switch_tab(name):
+            current_tab.set(name)
+            for n, f in tab_frames.items():
+                f.pack_forget()
+            tab_frames[name].pack(fill="both", expand=True, padx=24, pady=(16, 20))
+            for n, b in tab_buttons.items():
+                if n == name:
+                    b.config(fg=FG, bg=SURFACE2)
+                else:
+                    b.config(fg=FG2, bg=BG)
 
-        subtitle = tk.Label(
-            root,
-            text="Background dictation control panel",
-            font=("Helvetica", 10),
-            bg=BG,
-            fg=MUTED,
-        )
-        subtitle.pack(anchor="w", padx=20, pady=(0, 14))
-
-        status_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
-        status_card.pack(fill="x", padx=20)
-
-        status_title = tk.Label(status_card, text="Status", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG)
-        status_title.grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
-
-        status_var = tk.StringVar(value="Starting")
-        status_label = tk.Label(status_card, textvariable=status_var, font=("Helvetica", 15, "bold"), bg=PANEL, fg=FG)
-        status_label.grid(row=1, column=0, sticky="w", padx=16)
-
-        detail_var = tk.StringVar(value="")
-        detail_label = tk.Label(status_card, textvariable=detail_var, font=("Helvetica", 11), bg=PANEL, fg=MUTED)
-        detail_label.grid(row=2, column=0, sticky="w", padx=16, pady=(4, 2))
-
-        updated_var = tk.StringVar(value="")
-        updated_label = tk.Label(status_card, textvariable=updated_var, font=("Helvetica", 9), bg=PANEL, fg=MUTED)
-        updated_label.grid(row=3, column=0, sticky="w", padx=16, pady=(0, 14))
-
-        settings_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
-        settings_card.pack(fill="x", padx=20, pady=(14, 0))
-
-        tk.Label(settings_card, text="Settings", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).grid(
-            row=0, column=0, sticky="w", padx=16, pady=(14, 8), columnspan=2
-        )
-
-        def add_dropdown(parent, label, values, display_map, current, row):
-            tk.Label(parent, text=label, font=("Helvetica", 10), bg=PANEL, fg=MUTED).grid(
-                row=row, column=0, sticky="w", padx=16, pady=(8, 2), columnspan=2
+        for tab_name, tab_label in [("settings", "Settings"), ("models", "Models"), ("history", "History")]:
+            btn = tk.Button(
+                tab_bar, text=tab_label, font=(FONT, 12, "bold"),
+                bg=BG, fg=FG2, relief="flat", bd=0, padx=16, pady=6,
+                activebackground=SURFACE2, activeforeground=FG,
+                command=lambda n=tab_name: switch_tab(n),
             )
+            btn.pack(side="left", padx=(0, 4))
+            tab_buttons[tab_name] = btn
+
+        # Status line under tabs
+        status_line = tk.Frame(root, bg=BG)
+        status_line.pack(fill="x", padx=24, pady=(10, 0))
+
+        status_dot = tk.Label(status_line, text="\\u25CF", font=(FONT, 8), bg=BG, fg=GREEN)
+        status_dot.pack(side="left")
+        status_text = tk.Label(status_line, text="Ready", font=(FONT, 11), bg=BG, fg=FG2)
+        status_text.pack(side="left", padx=(6, 0))
+        hotkey_text = tk.Label(status_line, text="", font=(FONT, 11), bg=BG, fg=FG2)
+        hotkey_text.pack(side="right")
+
+        # ════════════════════════════════════════
+        # TAB: Settings
+        # ════════════════════════════════════════
+        settings_frame = tk.Frame(root, bg=BG)
+        tab_frames["settings"] = settings_frame
+
+        def make_section(parent, title):
+            frame = tk.Frame(parent, bg=SURFACE)
+            frame.pack(fill="x", pady=(0, 12))
+            if title:
+                tk.Label(frame, text=title, font=(FONT, 10), bg=SURFACE, fg=FG2).pack(
+                    anchor="w", padx=16, pady=(12, 4))
+            return frame
+
+        def make_dropdown(parent, values, display_map, current):
             display_values = [display_map.get(v, v) if display_map else v for v in values]
             current_display = display_map.get(current, current) if display_map else current
             var = tk.StringVar(value=current_display)
             menu = tk.OptionMenu(parent, var, *display_values)
             menu.config(
-                bg=FIELD_BG,
-                fg=FG,
-                font=("Helvetica", 10),
-                highlightthickness=0,
-                relief="flat",
-                width=24,
-                activebackground="#3D3D3D",
-                activeforeground=FG,
+                bg=SURFACE2, fg=FG, font=(FONT, 11),
+                highlightthickness=0, relief="flat", width=22,
+                activebackground=HOVER, activeforeground=FG, bd=0,
             )
-            menu["menu"].config(bg=FIELD_BG, fg=FG, font=("Helvetica", 10), activebackground=ACCENT, activeforeground="white")
-            menu.grid(row=row + 1, column=0, sticky="w", padx=16, pady=(0, 4), columnspan=2)
+            menu["menu"].config(
+                bg=SURFACE2, fg=FG, font=(FONT, 11),
+                activebackground=ACCENT, activeforeground="white",
+                borderwidth=0,
+            )
+            menu.pack(anchor="w", padx=16, pady=(0, 12))
             return var, display_map
 
-        def add_checkbox(parent, label, current, row):
+        def make_toggle(parent, label, current):
             var = tk.BooleanVar(value=current)
             cb = tk.Checkbutton(
-                parent,
-                text=label,
-                variable=var,
-                font=("Helvetica", 10),
-                bg=PANEL,
-                fg=FG,
-                selectcolor=FIELD_BG,
-                activebackground=PANEL,
-                activeforeground=FG,
-                highlightthickness=0,
+                parent, text=label, variable=var,
+                font=(FONT, 11), bg=SURFACE, fg=FG,
+                selectcolor=SURFACE2, activebackground=SURFACE, activeforeground=FG,
+                highlightthickness=0, bd=0,
             )
-            cb.grid(row=row, column=0, sticky="w", padx=12, pady=4, columnspan=2)
+            cb.pack(anchor="w", padx=12, pady=4)
             return var
 
-        row = 1
-        hotkey_var = add_dropdown(settings_card, "Hotkey", list(hotkeys.keys()), hotkeys, cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"), row)
-        row += 2
+        # Hotkey section
+        sec = make_section(settings_frame, "Hotkey")
+        hotkey_var = make_dropdown(sec, list(hotkeys.keys()), hotkeys,
+                                   cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"))
 
-        model_var = add_dropdown(settings_card, "Model", models, model_display, cfg.get("model", "small"), row)
-        model_row = row
-        row += 2
+        # Model section (only downloaded models)
+        sec = make_section(settings_frame, "Model")
+        downloaded = get_downloaded()
+        available_for_use = [m for m in models if m in downloaded]
+        if not available_for_use:
+            available_for_use = ["small"]  # fallback
+        model_var = make_dropdown(sec, available_for_use, {{}},
+                                  cfg.get("model", "small") if cfg.get("model", "small") in available_for_use else available_for_use[0])
+        no_models_label = None
+        if len(downloaded) == 0:
+            no_models_label = tk.Label(sec, text="No models downloaded. Go to Models tab.",
+                                        font=(FONT, 10), bg=SURFACE, fg=ORANGE)
+            no_models_label.pack(anchor="w", padx=16, pady=(0, 8))
 
-        def show_model_info():
-            popup = tk.Toplevel(root)
-            popup.title("Model Comparison")
-            popup.configure(bg=BG)
-            popup.attributes("-topmost", True)
-            popup.geometry("560x320")
-            popup.resizable(False, False)
+        # Language section
+        sec = make_section(settings_frame, "Language")
+        lang_var = make_dropdown(sec, langs, lang_names, cfg.get("language", "auto"))
 
-            popup.update_idletasks()
-            pw = popup.winfo_width()
-            ph = popup.winfo_height()
-            px = (popup.winfo_screenwidth() - pw) // 2
-            py = (popup.winfo_screenheight() - ph) // 2
-            popup.geometry(f"{{pw}}x{{ph}}+{{px}}+{{py}}")
+        # Toggles section
+        sec = make_section(settings_frame, None)
+        paste_var = make_toggle(sec, "Auto-paste after transcription", cfg.get("auto_paste", True))
+        gpu_var = make_toggle(sec, "Use GPU (CUDA)", cfg.get("gpu_enabled", True))
+        tk.Frame(sec, bg=SURFACE, height=8).pack()  # spacer
 
-            header_frame = tk.Frame(popup, bg=PANEL)
-            header_frame.pack(fill="x", padx=12, pady=(12, 0))
-            headers = ["Model", "Size", "Speed", "Quality", "Status"]
-            col_widths = [16, 8, 10, 10, 12]
-            for ci, (htext, cw) in enumerate(zip(headers, col_widths)):
-                tk.Label(
-                    header_frame, text=htext, font=("Helvetica", 10, "bold"),
-                    bg=PANEL, fg=ACCENT, width=cw, anchor="w"
-                ).grid(row=0, column=ci, padx=4, pady=6)
-
-            table_frame = tk.Frame(popup, bg=BG)
-            table_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-
-            for ri, name in enumerate(models):
-                info = model_info.get(name, {{}})
-                speed = info.get("speed", 0)
-                quality = info.get("quality", 0)
-                speed_stars = "\u2605" * speed + "\u2606" * (5 - speed)
-                quality_stars = "\u2605" * quality + "\u2606" * (5 - quality)
-                status = "Downloaded" if name in downloaded else "\u2014"
-                row_bg = PANEL if ri % 2 == 0 else PANEL_ALT
-                values = [name, info.get("size", "?"), speed_stars, quality_stars, status]
-                for ci, (val, cw) in enumerate(zip(values, col_widths)):
-                    fg_color = ACCENT if val == "Downloaded" else FG
-                    tk.Label(
-                        table_frame, text=val, font=("Helvetica", 10),
-                        bg=row_bg, fg=fg_color, width=cw, anchor="w"
-                    ).grid(row=ri, column=ci, padx=4, pady=3)
-
-            tk.Button(
-                popup, text="Close", command=popup.destroy,
-                bg=FIELD_BG, fg=FG, font=("Helvetica", 10),
-                relief="flat", padx=14, pady=4,
-                activebackground="#3D3D3D", activeforeground=FG,
-            ).pack(pady=(0, 12))
-
-        info_btn = tk.Button(
-            settings_card, text="i", command=show_model_info,
-            bg=FIELD_BG, fg=ACCENT, font=("Helvetica", 10, "bold"),
-            relief="flat", width=3, height=1,
-            activebackground="#3D3D3D", activeforeground=ACCENT,
-        )
-        info_btn.grid(row=model_row + 1, column=1, sticky="e", padx=(0, 16))
-
-        lang_var = add_dropdown(settings_card, "Language", langs, lang_names, cfg.get("language", "auto"), row)
-        row += 2
-
-        paste_var = add_checkbox(settings_card, "Auto-paste", cfg.get("auto_paste", True), row)
-        row += 1
-        gpu_var = add_checkbox(settings_card, "Use GPU (CUDA)", cfg.get("gpu_enabled", True), row)
-        row += 1
-
-        tk.Label(
-            settings_card,
-            text="Changes apply immediately after Save.",
-            font=("Helvetica", 9),
-            bg=PANEL,
-            fg=MUTED,
-        ).grid(row=row, column=0, sticky="w", padx=16, pady=(8, 14), columnspan=2)
-
-        transcripts_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
-        transcripts_card.pack(fill="both", expand=True, padx=20, pady=(14, 0))
-
-        tk.Label(transcripts_card, text="Transcripts", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).pack(
-            anchor="w", padx=16, pady=(14, 6)
-        )
-
-        # Scrollable container using Canvas + Frame
-        canvas = tk.Canvas(transcripts_card, bg=PANEL, highlightthickness=0, bd=0)
-        scrollbar = tk.Scrollbar(transcripts_card, orient="vertical", command=canvas.yview)
-        scroll_frame = tk.Frame(canvas, bg=PANEL)
-
-        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Mouse wheel scrolling for all platforms
-        def _on_mousewheel(event):
-            canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-        scrollbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=(0, 14))
-
-        def build_transcript_cards():
-            for widget in scroll_frame.winfo_children():
-                widget.destroy()
-
-            history = read_json(history_path, [])
-            if not history:
-                tk.Label(scroll_frame, text="No transcripts yet.", font=("Helvetica", 10), bg=PANEL, fg=MUTED).pack(
-                    anchor="w", padx=8, pady=8
-                )
-                return
-
-            for entry in history[:20]:
-                stamp = entry.get("timestamp", "")
-                text = entry.get("text", "")
-
-                card = tk.Frame(scroll_frame, bg=FIELD_BG, highlightbackground=BORDER, highlightthickness=1)
-                card.pack(fill="x", padx=4, pady=(0, 6))
-
-                header = tk.Frame(card, bg=FIELD_BG)
-                header.pack(fill="x", padx=10, pady=(8, 2))
-
-                tk.Label(header, text=stamp, font=("Helvetica", 9), bg=FIELD_BG, fg=MUTED).pack(side="left")
-
-                def make_copy_fn(t, btn):
-                    def copy_fn():
-                        import subprocess as sp
-                        if is_mac:
-                            p = sp.Popen(["pbcopy"], stdin=sp.PIPE)
-                            p.communicate(t.encode("utf-8"))
-                        else:
-                            root.clipboard_clear()
-                            root.clipboard_append(t)
-                        btn.config(text="Copied!", fg=ACCENT)
-                        root.after(1200, lambda: btn.config(text="Copy", fg=MUTED))
-                    return copy_fn
-
-                copy_btn = tk.Button(
-                    header,
-                    text="Copy",
-                    font=("Helvetica", 9),
-                    bg=FIELD_BG,
-                    fg=MUTED,
-                    relief="flat",
-                    padx=6,
-                    pady=0,
-                    activebackground="#3D3D3D",
-                    activeforeground=FG,
-                )
-                copy_btn.pack(side="right")
-                copy_btn.config(command=make_copy_fn(text, copy_btn))
-
-                tk.Label(card, text=text, font=("Helvetica", 10), bg=FIELD_BG, fg=FG, anchor="w", justify="left", wraplength=580).pack(
-                    fill="x", padx=10, pady=(0, 8)
-                )
-
-            canvas.update_idletasks()
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-        logs_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
-        logs_card.pack(fill="both", expand=True, padx=20, pady=(14, 20))
-
-        tk.Label(logs_card, text="Live Log", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).pack(
-            anchor="w", padx=16, pady=(14, 6)
-        )
-        log_box = scrolledtext.ScrolledText(
-            logs_card,
-            width=68,
-            height=12,
-            wrap="word",
-            bg=FIELD_BG,
-            fg=FG,
-            insertbackground=FG,
-            relief="flat",
-            font=("Menlo", 10) if is_mac else ("Consolas", 10),
-        )
-        log_box.pack(fill="both", expand=True, padx=16)
-        log_box.config(state="disabled")
-
-        btn_frame = tk.Frame(logs_card, bg=PANEL)
-        btn_frame.pack(anchor="e", pady=(10, 14), padx=16)
-
-        def on_refresh():
-            refresh_runtime(False)
+        # Save button
+        btn_row = tk.Frame(settings_frame, bg=BG)
+        btn_row.pack(fill="x", pady=(4, 0))
 
         def on_save():
             result = dict(cfg)
-            if hotkey_var is not None:
-                reverse = {{v: k for k, v in hotkeys.items()}}
-                result["hotkey"] = reverse.get(hotkey_var[0].get(), hotkey_var[0].get())
-            raw_model = model_var[0].get()
-            for m in models:
-                if raw_model.startswith(m):
-                    raw_model = m
-                    break
-            result["model"] = raw_model
+            reverse_hotkey = {{v: k for k, v in hotkeys.items()}}
+            result["hotkey"] = reverse_hotkey.get(hotkey_var[0].get(), hotkey_var[0].get())
+            result["model"] = model_var[0].get()
             reverse_lang = {{v: k for k, v in lang_names.items()}}
             result["language"] = reverse_lang.get(lang_var[0].get(), lang_var[0].get())
             result["auto_paste"] = paste_var.get()
@@ -430,74 +262,221 @@ def _build_settings_script(cfg: dict) -> str:
             root.destroy()
 
         tk.Button(
-            btn_frame,
-            text="Refresh",
-            command=on_refresh,
-            bg=FIELD_BG,
-            fg=FG,
-            font=("Helvetica", 10),
-            relief="flat",
-            padx=14,
-            pady=6,
-            activebackground="#3D3D3D",
-            activeforeground=FG,
-        ).pack(side="left", padx=(0, 8))
+            btn_row, text="Save", command=on_save,
+            bg=ACCENT, fg="white", font=(FONT, 12, "bold"),
+            relief="flat", padx=24, pady=8, bd=0,
+            activebackground="#0070E0", activeforeground="white",
+        ).pack(side="right")
 
         tk.Button(
-            btn_frame,
-            text="Close",
-            command=root.destroy,
-            bg=FIELD_BG,
-            fg=FG,
-            font=("Helvetica", 10),
-            relief="flat",
-            padx=14,
-            pady=6,
-            activebackground="#3D3D3D",
-            activeforeground=FG,
-        ).pack(side="left", padx=(0, 8))
+            btn_row, text="Close", command=root.destroy,
+            bg=SURFACE2, fg=FG, font=(FONT, 11),
+            relief="flat", padx=16, pady=8, bd=0,
+            activebackground=HOVER, activeforeground=FG,
+        ).pack(side="right", padx=(0, 8))
 
-        tk.Button(
-            btn_frame,
-            text="Save",
-            command=on_save,
-            bg=ACCENT,
-            fg="white",
-            font=("Helvetica", 10, "bold"),
-            relief="flat",
-            padx=20,
-            pady=6,
-            activebackground="#388E3C",
-            activeforeground="white",
-        ).pack(side="left")
+        # ════════════════════════════════════════
+        # TAB: Models
+        # ════════════════════════════════════════
+        models_frame = tk.Frame(root, bg=BG)
+        tab_frames["models"] = models_frame
 
-        def refresh_runtime(schedule_next=True):
+        models_list_frame = tk.Frame(models_frame, bg=BG)
+        models_list_frame.pack(fill="both", expand=True)
+
+        def build_model_cards():
+            for w in models_list_frame.winfo_children():
+                w.destroy()
+
+            dl = get_downloaded()
+
+            for name in models:
+                info = model_info.get(name, {{}})
+                is_dl = name in dl
+
+                card = tk.Frame(models_list_frame, bg=SURFACE)
+                card.pack(fill="x", pady=(0, 8))
+
+                # Top row: name + size
+                top = tk.Frame(card, bg=SURFACE)
+                top.pack(fill="x", padx=16, pady=(12, 0))
+
+                label = name
+                if info.get("recommended"):
+                    label += "  (recommended)"
+                tk.Label(top, text=label, font=(FONT, 12, "bold"), bg=SURFACE, fg=FG).pack(side="left")
+                tk.Label(top, text=info.get("size", ""), font=(FONT, 11), bg=SURFACE, fg=FG2).pack(side="right")
+
+                # Bottom row: speed/quality + action button
+                bot = tk.Frame(card, bg=SURFACE)
+                bot.pack(fill="x", padx=16, pady=(4, 12))
+
+                speed = info.get("speed", 0)
+                quality = info.get("quality", 0)
+                tk.Label(bot, text=f"Speed {{speed}}/5   Quality {{quality}}/5",
+                         font=(FONT, 10), bg=SURFACE, fg=FG2).pack(side="left")
+
+                if is_dl:
+                    def make_delete(m):
+                        def do_delete():
+                            subprocess.Popen([
+                                sys.executable, "-c",
+                                f"import sys; sys.path.insert(0, str(r'{{project_dir.parent}}')); "
+                                f"from voice_input.transcriber import delete_model; delete_model('{{m}}')"
+                            ])
+                            root.after(500, build_model_cards)
+                        return do_delete
+                    tk.Button(
+                        bot, text="Delete", command=make_delete(name),
+                        bg=SURFACE2, fg=RED, font=(FONT, 10),
+                        relief="flat", padx=12, pady=2, bd=0,
+                        activebackground=HOVER, activeforeground=RED,
+                    ).pack(side="right")
+                    tk.Label(bot, text="\\u2713 Downloaded", font=(FONT, 10), bg=SURFACE, fg=GREEN).pack(side="right", padx=(0, 12))
+                else:
+                    def make_download(m, btn_ref):
+                        def do_download():
+                            btn_ref[0].config(text="Downloading...", state="disabled", fg=ORANGE)
+                            def run():
+                                subprocess.run([
+                                    sys.executable, "-c",
+                                    f"import sys; sys.path.insert(0, str(r'{{project_dir.parent}}')); "
+                                    f"from voice_input.transcriber import download_model; download_model('{{m}}')"
+                                ])
+                                root.after(0, build_model_cards)
+                            threading.Thread(target=run, daemon=True).start()
+                        return do_download
+                    btn_holder = [None]
+                    dl_btn = tk.Button(
+                        bot, text="Download",
+                        bg=ACCENT, fg="white", font=(FONT, 10, "bold"),
+                        relief="flat", padx=12, pady=2, bd=0,
+                        activebackground="#0070E0", activeforeground="white",
+                    )
+                    btn_holder[0] = dl_btn
+                    dl_btn.config(command=make_download(name, btn_holder))
+                    dl_btn.pack(side="right")
+
+        build_model_cards()
+
+        # ════════════════════════════════════════
+        # TAB: History
+        # ════════════════════════════════════════
+        history_frame = tk.Frame(root, bg=BG)
+        tab_frames["history"] = history_frame
+
+        canvas = tk.Canvas(history_frame, bg=BG, highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(history_frame, orient="vertical", command=canvas.yview)
+        scroll_inner = tk.Frame(canvas, bg=BG)
+
+        scroll_inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scroll_inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        def build_history_cards():
+            for w in scroll_inner.winfo_children():
+                w.destroy()
+
+            history = read_json(history_path, [])
+            if not history:
+                tk.Label(scroll_inner, text="No transcripts yet.", font=(FONT, 11),
+                         bg=BG, fg=FG2).pack(anchor="w", pady=16)
+                return
+
+            for entry in history[:20]:
+                stamp = entry.get("timestamp", "")
+                text = entry.get("text", "")
+
+                card = tk.Frame(scroll_inner, bg=SURFACE)
+                card.pack(fill="x", pady=(0, 6))
+
+                header = tk.Frame(card, bg=SURFACE)
+                header.pack(fill="x", padx=14, pady=(10, 2))
+
+                # Just time portion if available
+                time_str = stamp.split(" ")[-1] if " " in stamp else stamp
+                date_str = stamp.split(" ")[0] if " " in stamp else ""
+                tk.Label(header, text=time_str, font=(MONO, 10), bg=SURFACE, fg=FG2).pack(side="left")
+                tk.Label(header, text=date_str, font=(FONT, 9), bg=SURFACE, fg=SURFACE2).pack(side="left", padx=(8, 0))
+
+                def make_copy(t, btn):
+                    def do_copy():
+                        if is_mac:
+                            p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+                            p.communicate(t.encode("utf-8"))
+                        else:
+                            root.clipboard_clear()
+                            root.clipboard_append(t)
+                        btn.config(text="\\u2713", fg=GREEN)
+                        root.after(1000, lambda: btn.config(text="Copy", fg=FG2))
+                    return do_copy
+
+                copy_btn = tk.Button(
+                    header, text="Copy", font=(FONT, 9),
+                    bg=SURFACE, fg=FG2, relief="flat", padx=8, pady=0, bd=0,
+                    activebackground=HOVER, activeforeground=FG,
+                )
+                copy_btn.pack(side="right")
+                copy_btn.config(command=make_copy(text, copy_btn))
+
+                tk.Label(card, text=text, font=(FONT, 11), bg=SURFACE, fg=FG,
+                         anchor="w", justify="left", wraplength=520).pack(
+                    fill="x", padx=14, pady=(0, 10))
+
+            canvas.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        # ── Status polling ──
+        def refresh_status(schedule=True):
             status = read_json(status_path, {{}})
-            state = status.get("state", "hidden").replace("_", " ").title()
-            if not status.get("active", True):
-                state = "Paused"
-            status_var.set(state)
-            if status.get("state") == "downloading":
-                status_label.config(fg="#FFA726")  # Orange
-            elif status.get("state") == "loading":
-                status_label.config(fg="#42A5F5")  # Blue
-            else:
-                status_label.config(fg=FG)
-            detail_var.set(status.get("detail", ""))
-            updated = status.get("updated_at", "")
+            state = status.get("state", "hidden")
+            detail = status.get("detail", "Ready")
             hotkey = status.get("hotkey", "")
-            updated_var.set(f"Updated: {{updated}}    Hotkey: {{hotkey}}")
 
-            build_transcript_cards()
+            if not status.get("active", True):
+                label = "Paused"
+                dot_color = ORANGE
+            elif state == "downloading":
+                label = detail
+                dot_color = ORANGE
+            elif state == "loading":
+                label = detail
+                dot_color = ACCENT
+            elif state == "listening":
+                label = "Listening"
+                dot_color = RED
+            elif state == "transcribing":
+                label = "Transcribing"
+                dot_color = ORANGE
+            elif state in ("done", "hidden"):
+                label = "Ready" if detail in ("Ready", "Settings saved", "Starting") else detail
+                dot_color = GREEN
+            else:
+                label = detail or state.replace("_", " ").title()
+                dot_color = FG2
 
-            log_text = read_text(log_path, "")
-            lines = log_text.splitlines()
-            set_text(log_box, "\\n".join(lines[-80:]) if lines else "No log output yet.")
+            status_dot.config(fg=dot_color)
+            status_text.config(text=label)
+            if hotkey:
+                hotkey_text.config(text=f"\\u2318 {{hotkey}}" if is_mac else f"{{hotkey}}")
 
-            if schedule_next:
-                root.after(1200, refresh_runtime)
+            # Refresh history if on that tab
+            if current_tab.get() == "history":
+                build_history_cards()
 
-        refresh_runtime()
+            if schedule:
+                root.after(1200, refresh_status)
+
+        # ── Init ──
+        switch_tab("settings")
+        refresh_status()
         root.mainloop()
         """
     )
