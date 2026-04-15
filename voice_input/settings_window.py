@@ -52,6 +52,7 @@ def _build_settings_script(cfg: dict) -> str:
     model_info_json = json.dumps(config.MODEL_INFO)
     model_dir_json = json.dumps(str(config.MODEL_DIR))
     project_dir_json = json.dumps(str(config.MODULE_DIR))
+    config_path_json = json.dumps(str(config.CONFIG_PATH))
 
     return textwrap.dedent(
         f"""\
@@ -71,6 +72,7 @@ is_mac = {is_mac_json}
 model_info = json.loads({model_info_json!r})
 model_dir = pathlib.Path(json.loads({model_dir_json!r}))
 project_dir = pathlib.Path(json.loads({project_dir_json!r}))
+config_path = pathlib.Path(json.loads({config_path_json!r}))
 
 # ── Dark palette ──
 BG      = "#1C1C1E"
@@ -229,10 +231,26 @@ sep(root)
 # ════════════════════════════════════════
 _init = [False]
 
+def build_cfg():
+    rev_hk = {{v: k for k, v in hotkeys.items()}}
+    rev_lang = {{v: k for k, v in lang_names.items()}}
+    return {{
+        "hotkey": rev_hk.get(hk_pill.get(), hk_pill.get()),
+        "model": md_pill.get(),
+        "language": rev_lang.get(lg_pill.get(), lg_pill.get()),
+        "auto_paste": paste_toggle.get(),
+    }}
+
 def schedule_save(*_a):
-    if _init[0]:
+    if not _init[0]:
+        return
+    try:
+        new_cfg = build_cfg()
+        config_path.write_text(json.dumps(new_cfg, indent=2, ensure_ascii=False), encoding="utf-8")
         status_lbl.config(text="Saved", fg=GREEN)
         root.after(1500, lambda: status_lbl.config(fg=FG2))
+    except Exception:
+        pass
 
 # ════════════════════════════════════════
 # TAB: Settings
@@ -372,13 +390,7 @@ paste_toggle.pack(anchor="w", padx=20, pady=6)
 
 # Output config on window close
 def on_close():
-    result = dict(cfg)
-    rev_hk = {{v: k for k, v in hotkeys.items()}}
-    result["hotkey"] = rev_hk.get(hk_pill.get(), hk_pill.get())
-    result["model"] = md_pill.get()
-    rev_lang = {{v: k for k, v in lang_names.items()}}
-    result["language"] = rev_lang.get(lg_pill.get(), lg_pill.get())
-    result["auto_paste"] = paste_toggle.get()
+    result = build_cfg()
     print(json.dumps(result))
     root.destroy()
 

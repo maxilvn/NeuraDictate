@@ -16,15 +16,17 @@ from .settings_window import SettingsWindow
 from .transcriber import transcribe, unload_model, warm_up_model, download_model, delete_model
 from .tray import TrayApp
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(config.LOG_PATH, encoding="utf-8"),
-    ],
-    force=True,
-)
+_log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+_root = logging.getLogger()
+_root.setLevel(logging.INFO)
+# Avoid duplicate handlers on re-import
+if not _root.handlers:
+    _root.addHandler(logging.StreamHandler())
+    _fh = logging.FileHandler(config.LOG_PATH, encoding="utf-8")
+    _fh.setFormatter(logging.Formatter(_log_fmt))
+    _root.addHandler(_fh)
+for _h in _root.handlers:
+    _h.setFormatter(logging.Formatter(_log_fmt))
 log = logging.getLogger(__name__)
 
 
@@ -67,6 +69,9 @@ class VoiceInputApp:
 
         # Preload the selected model so first transcription does not pay model-load cost.
         threading.Thread(target=warm_up_model, args=(dict(self._cfg),), daemon=True).start()
+
+        # Start config watcher for live settings updates
+        self._start_config_watcher()
 
         # Open a lightweight control panel instead of relying on terminal output.
         self._open_control_panel()
@@ -147,24 +152,53 @@ class VoiceInputApp:
             log.info("Paused")
             self._write_status(HudState.HIDDEN, "Paused")
 
+    def _start_config_watcher(self) -> None:
+        """Poll config.json every 2s for live changes from settings window."""
+        self._config_mtime = 0
+        try:
+            if config.CONFIG_PATH.exists():
+                self._config_mtime = config.CONFIG_PATH.stat().st_mtime
+        except OSError:
+            pass
+
+        def watch():
+            while True:
+                import time
+                time.sleep(2)
+                try:
+                    if not config.CONFIG_PATH.exists():
+                        continue
+                    mtime = config.CONFIG_PATH.stat().st_mtime
+                    if mtime > self._config_mtime:
+                        self._config_mtime = mtime
+                        new_cfg = config.load()
+                        self._apply_config(new_cfg)
+                except Exception:
+                    log.exception("Config watcher error")
+
+        threading.Thread(target=watch, daemon=True).start()
+
+    def _apply_config(self, new_cfg: dict) -> None:
+        """Apply config changes (hotkey, model, etc)."""
+        old_hotkey = self._cfg.get("hotkey")
+        old_model = self._cfg.get("model")
+        self._cfg = new_cfg
+
+        if new_cfg.get("hotkey") != old_hotkey and self._hotkey:
+            self._hotkey.update_hotkey(new_cfg.get("hotkey", "fn"))
+
+        if new_cfg.get("model") != old_model:
+            unload_model()
+            threading.Thread(target=warm_up_model, args=(dict(self._cfg),), daemon=True).start()
+
+        log.info("Config applied: hotkey=%s model=%s", new_cfg.get("hotkey"), new_cfg.get("model"))
+        self._write_status(HudState.HIDDEN, "Settings saved")
+
     def _open_control_panel(self, blocking: bool = False) -> None:
         def on_save(new_cfg: dict):
-            old_model = self._cfg.get("model")
-            old_gpu_enabled = self._cfg.get("gpu_enabled", True)
-            self._cfg = new_cfg
-            config.save(new_cfg)
-
-            # Update hotkey
-            if self._hotkey:
-                self._hotkey.update_hotkey(new_cfg.get("hotkey", "Key.alt_r"))
-
-            # Reload model if changed
-            if new_cfg.get("model") != old_model or new_cfg.get("gpu_enabled", True) != old_gpu_enabled:
-                unload_model()
-                threading.Thread(target=warm_up_model, args=(dict(self._cfg),), daemon=True).start()
-
-            log.info("Settings saved")
-            self._write_status(HudState.HIDDEN, "Settings saved")
+            # Config was already written to disk by the settings window
+            # and picked up by the watcher. Just update our in-memory copy.
+            self._apply_config(new_cfg)
 
         win = SettingsWindow(self._cfg, on_save)
         win.show(blocking=blocking)
