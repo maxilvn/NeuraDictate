@@ -39,6 +39,7 @@ class VoiceInputApp:
         self._tray: TrayApp | None = None
         self._active = True
         self._transcribing = False
+        self._cancel_transcription = False
         self._panel_open = False
 
     def run(self) -> None:
@@ -87,8 +88,13 @@ class VoiceInputApp:
         self._tray.run()
 
     def _on_key_press(self) -> None:
-        if not self._active or self._transcribing:
+        if not self._active:
             return
+        if self._transcribing:
+            # Cancel current transcription and start fresh
+            log.info("Key pressed during transcription - cancelling and restarting")
+            self._cancel_transcription = True
+            self._transcribing = False
         log.info("Key pressed (%s) - start recording", config.HOTKEY_OPTIONS.get(self._cfg.get("hotkey"), "?"))
         self._hud.show(HudState.LISTENING)
         self._write_status(HudState.LISTENING, "Recording")
@@ -109,6 +115,7 @@ class VoiceInputApp:
 
         # Transcribe in background thread
         self._transcribing = True
+        self._cancel_transcription = False
         self._write_status(HudState.TRANSCRIBING, "Transcribing")
         threading.Thread(target=self._do_transcribe, args=(wav_path,), daemon=True).start()
 
@@ -121,6 +128,9 @@ class VoiceInputApp:
             t = threading.Thread(target=_run, daemon=True)
             t.start()
             t.join(timeout=30)
+            if self._cancel_transcription:
+                log.info("Transcription cancelled")
+                return
             if t.is_alive():
                 log.error("Transcription timed out after 30s")
                 self._hud.show(HudState.ERROR, "Timeout")
