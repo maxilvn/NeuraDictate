@@ -132,6 +132,31 @@ def warm_up_model(cfg: dict) -> None:
         log.exception("Model warm-up failed")
 
 
+import re
+
+# Filler words to remove (German + English)
+_FILLERS = re.compile(
+    r'\b(?:ähm|äh|öh|uhm|uh|um|hm+|hmm+|also\s+(?:ähm|äh)|'
+    r'halt|sozusagen|quasi|irgendwie|'
+    r'you know|like|basically|literally|I mean)\b',
+    re.IGNORECASE
+)
+
+def _clean_text(text: str) -> str:
+    """Remove filler words and clean up repeated words/punctuation."""
+    if not text:
+        return text
+    # Remove filler words
+    text = _FILLERS.sub("", text)
+    # Remove repeated words: "das das" -> "das"
+    text = re.sub(r'\b(\w+)\s+\1\b', r'\1', text, flags=re.IGNORECASE)
+    # Clean up multiple spaces and punctuation artifacts
+    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'\s+([,.])', r'\1', text)
+    text = re.sub(r'^[,.\s]+', '', text)
+    return text.strip()
+
+
 def transcribe(wav_path: str, cfg: dict) -> str:
     """Transcribe a WAV file. Returns the transcribed text."""
     model = get_model(cfg)
@@ -163,6 +188,7 @@ def transcribe(wav_path: str, cfg: dict) -> str:
 
     text = " ".join(text_parts).strip()
     text = " ".join(text.split())
+    text = _clean_text(text)
 
     t2 = time.monotonic()
 

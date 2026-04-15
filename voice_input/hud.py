@@ -104,9 +104,9 @@ class _MacHud:
             False,
         )
         self._panel.setLevel_(AppKit.NSFloatingWindowLevel + 1)
-        self._panel.setOpaque_(True)
-        self._panel.setBackgroundColor_(AppKit.NSColor.whiteColor())
-        self._panel.setAlphaValue_(0.95)
+        self._panel.setOpaque_(False)
+        self._panel.setBackgroundColor_(AppKit.NSColor.clearColor())
+        self._panel.setAlphaValue_(0.98)
         self._panel.setHasShadow_(True)
         self._panel.setCollectionBehavior_(
             AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -174,7 +174,7 @@ class _MacHud:
             dot_color = _hex_to_nscolor(dot_hex)
 
             # Use "N" for transcribing, dot for others
-            dot_char = "N" if state == HudState.TRANSCRIBING else "\\u25CF"
+            dot_char = "N" if state == HudState.TRANSCRIBING else "\u25CF"
             dot_font_size = self._pulse_size if state == HudState.TRANSCRIBING else 13
             dot_font = AppKit.NSFont.systemFontOfSize_weight_(dot_font_size, 0.7)
 
