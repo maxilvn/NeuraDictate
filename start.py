@@ -65,9 +65,18 @@ if __name__ == "__main__":
                 start_new_session=True,
                 env=env,
             )
-            # Close the Terminal window that launched us
+            # Close the Terminal/iTerm window that launched us
             subprocess.Popen(["osascript", "-e",
-                'tell application "Terminal" to close front window'],
+                'try\n'
+                '  tell application "Terminal"\n'
+                '    if it is frontmost then close front window\n'
+                '  end tell\n'
+                'end try\n'
+                'try\n'
+                '  tell application "iTerm2"\n'
+                '    if it is frontmost then tell current session of current window to close\n'
+                '  end tell\n'
+                'end try'],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             sys.exit(0)
     elif not _HEADLESS and sys.platform == "win32":
