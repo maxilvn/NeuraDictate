@@ -50,12 +50,14 @@ class Recorder:
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
+            # Grab frames under lock so callback can't append more
+            frames = list(self._frames)
+            self._frames.clear()
 
-        if not self._frames:
+        if not frames:
             return None
 
-        audio_data = np.concatenate(self._frames)
-        self._frames.clear()
+        audio_data = np.concatenate(frames)
 
         wav_path = str(config.RECORDING_PATH)
         buf = io.BytesIO()

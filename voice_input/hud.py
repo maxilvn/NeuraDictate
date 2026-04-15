@@ -332,7 +332,12 @@ class _TkHud:
 
     def stop(self) -> None:
         if self._root:
-            self._root.after(0, self._root.destroy)
+            def _do_stop():
+                if self._hide_timer:
+                    self._root.after_cancel(self._hide_timer)
+                    self._hide_timer = None
+                self._root.destroy()
+            self._root.after(0, _do_stop)
             self._root = None
 
 

@@ -1,55 +1,60 @@
-# Voice Input - Lokale Speech-to-Text Alternative
+# NeuraDictate
 
-Lokale WhisperFlow-Alternative. Läuft 100% auf deinem Rechner - keine Daten an externe Server, DSGVO-konform, keine laufenden Kosten.
+Lokale Speech-to-Text Diktiersoftware. Laeuft 100% auf deinem Rechner - keine Daten an externe Server.
 
-## Installation (Windows)
+## Quick Start
 
-1. **Doppelklick auf `setup_windows.bat`**
-2. Fertig. Desktop-Shortcut "Voice Input" wird erstellt.
+**Voraussetzung:** Python 3.10+ ([python.org](https://python.org) - bei Windows "Add to PATH" anhaken)
 
-### Voraussetzungen
+```bash
+git clone https://github.com/DEIN-USERNAME/NeuraDictate.git
+cd NeuraDictate
+python start.py
+```
 
-- Windows 10/11
-- Python 3.10+ (wird automatisch installiert falls nicht vorhanden)
-- Mikrofon
-- Optional: NVIDIA GPU mit CUDA für schnellere Transcription
+Beim ersten Start:
+- Dependencies werden automatisch installiert
+- Das Whisper "small" Model (466 MB) wird heruntergeladen
+- App startet im Hintergrund (Tray-Icon)
+
+### macOS
+macOS fragt nach **Accessibility-Berechtigung** (Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen).
+
+### Windows
+Alternativ: Doppelklick auf `VoiceInput-Windows.vbs`
 
 ## Benutzung
 
-1. Starte "Voice Input" vom Desktop
-2. **Rechte Alt-Taste gedrückt halten** = Aufnahme läuft
-3. **Loslassen** = Text wird transkribiert und eingefügt
+1. **Taste gedrueckt halten** = Aufnahme
+2. **Loslassen** = Transkription + Auto-Paste
 
-### Status-Anzeige (HUD)
+| Plattform | Standard-Hotkey | Alternativen |
+|-----------|----------------|--------------|
+| macOS     | Fn             | Right Option, Right Command, Left Control |
+| Windows   | Right Alt      | Caps Lock, Scroll Lock, Pause |
 
-| Farbe  | Bedeutung      |
-|--------|---------------|
-| Rot    | Aufnahme läuft |
-| Orange | Transkribiert  |
-| Grün   | Fertig/Kopiert |
-| Pink   | Fehler         |
+Einstellungen ueber **Tray-Icon > Control Panel**.
 
-### Settings
+## Models
 
-Rechtsklick auf das Tray-Icon → Settings:
+| Model | Groesse | Speed | Qualitaet |
+|-------|---------|-------|-----------|
+| tiny | 75 MB | 5/5 | 2/5 |
+| base | 142 MB | 4/5 | 3/5 |
+| **small** | **466 MB** | **3/5** | **4/5 (empfohlen)** |
+| medium | 1.5 GB | 2/5 | 4/5 |
+| large-v3-turbo | 1.5 GB | 4/5 | 5/5 |
+| large-v3 | 3 GB | 1/5 | 5/5 |
 
-- **Hotkey**: Right Alt, Caps Lock, Scroll Lock, Pause
-- **Model**: tiny (75MB, schnell) bis large-v3-turbo (1.5GB, beste Qualität)
-- **Sprache**: Auto-Detect oder manuell (DE, EN, FR, ...)
-- **Auto-Paste**: Text direkt einfügen oder nur in Zwischenablage
+Weitere Models ueber Settings > Models Tab herunterladen.
 
-## Modelle
+## Features
 
-| Model           | Größe  | Geschwindigkeit | Qualität |
-|-----------------|--------|-----------------|----------|
-| tiny            | 75 MB  | Sehr schnell    | Okay     |
-| base            | 142 MB | Schnell         | Gut      |
-| small           | 466 MB | Mittel          | Sehr gut |
-| medium          | 1.5 GB | Langsamer       | Exzellent|
-| large-v3-turbo  | 1.5 GB | Mittel          | Beste    |
-
-## Technologie
-
-- **faster-whisper** (CTranslate2) - optimierte Whisper-Implementierung
-- Läuft auf CPU und NVIDIA GPU (CUDA)
-- Audio-Aufnahme via sounddevice (16kHz, mono)
+- Automatische Spracherkennung (merkt sich die zuletzt erkannte Sprache)
+- Konfigurierbarer Hotkey
+- Model-Management (Download/Remove)
+- Session-basierte Transcript-History mit Copy-Button
+- Auto-Paste in aktives Fenster
+- HUD-Overlay (Listening/Transcribing/Copied)
+- Dark Mode Settings-Panel
+- Laeuft komplett lokal, keine Cloud

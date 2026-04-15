@@ -12,7 +12,6 @@ DEFAULT_CONFIG = {
     "model": "small",
     "language": "auto",
     "auto_paste": True,
-    "gpu_enabled": True,
 }
 
 MODEL_INFO = {

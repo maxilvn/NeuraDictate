@@ -1,8 +1,11 @@
-"""Transcription via faster-whisper with GPU→CPU fallback."""
+"""Transcription via faster-whisper with auto device/quantization selection."""
 
 import json
 import logging
 import os
+import sys
+import threading
+import time
 from datetime import datetime
 
 from . import config
@@ -11,6 +14,29 @@ log = logging.getLogger(__name__)
 
 _model_instance = None
 _model_name = None
+_model_lock = threading.Lock()
+_gpu_available = None
+_detected_language = None
+
+
+def _has_gpu() -> bool:
+    global _gpu_available
+    if _gpu_available is not None:
+        return _gpu_available
+    try:
+        import torch
+        _gpu_available = torch.cuda.is_available()
+    except ImportError:
+        _gpu_available = False
+    log.info("GPU acceleration: %s", "available" if _gpu_available else "not available")
+    return _gpu_available
+
+
+def _best_compute_type(use_gpu: bool) -> str:
+    if use_gpu:
+        return "float16"
+    # Let CTranslate2 pick the fastest type for this CPU (ARM NEON, AVX, etc.)
+    return "auto"
 
 
 def _write_download_status(model_name: str, state: str):
@@ -51,21 +77,23 @@ def _load_model(model_name: str, use_gpu: bool):
     from faster_whisper import WhisperModel
 
     device = "cuda" if use_gpu else "cpu"
-    compute_type = "float16" if use_gpu else "int8"
+    compute_type = _best_compute_type(use_gpu)
 
-    log.info("Loading model %s on %s...", model_name, device)
+    log.info("Loading model %s on %s (compute=%s)...", model_name, device, compute_type)
 
     if _is_model_downloaded(model_name):
         _write_download_status(model_name, "loading")
     else:
         _write_download_status(model_name, "downloading")
 
+    t0 = time.monotonic()
     model = WhisperModel(
         model_name,
         device=device,
         compute_type=compute_type,
         download_root=str(config.MODEL_DIR),
     )
+    log.info("Model %s loaded in %.1fs", model_name, time.monotonic() - t0)
 
     _write_download_status(model_name, "ready")
     return model
@@ -78,19 +106,22 @@ def get_model(cfg: dict):
     if _model_instance is not None and _model_name == model_name:
         return _model_instance
 
-    use_gpu = cfg.get("gpu_enabled", True)
-
-    if use_gpu:
-        try:
-            _model_instance = _load_model(model_name, use_gpu=True)
-            _model_name = model_name
+    with _model_lock:
+        # Re-check after acquiring lock
+        if _model_instance is not None and _model_name == model_name:
             return _model_instance
-        except Exception as e:
-            log.warning("GPU failed (%s), falling back to CPU", e)
 
-    _model_instance = _load_model(model_name, use_gpu=False)
-    _model_name = model_name
-    return _model_instance
+        if _has_gpu():
+            try:
+                _model_instance = _load_model(model_name, use_gpu=True)
+                _model_name = model_name
+                return _model_instance
+            except Exception as e:
+                log.warning("GPU not available (%s), using CPU", e)
+
+        _model_instance = _load_model(model_name, use_gpu=False)
+        _model_name = model_name
+        return _model_instance
 
 
 def warm_up_model(cfg: dict) -> None:
@@ -105,10 +136,16 @@ def transcribe(wav_path: str, cfg: dict) -> str:
     """Transcribe a WAV file. Returns the transcribed text."""
     model = get_model(cfg)
 
+    global _detected_language
+
     language = cfg.get("language", "auto")
     kwargs = {}
     if language != "auto":
         kwargs["language"] = language
+    elif _detected_language:
+        kwargs["language"] = _detected_language
+
+    t0 = time.monotonic()
 
     segments, info = model.transcribe(
         wav_path,
@@ -118,15 +155,26 @@ def transcribe(wav_path: str, cfg: dict) -> str:
         **kwargs,
     )
 
+    t1 = time.monotonic()
+
     text_parts = []
     for segment in segments:
         text_parts.append(segment.text.strip())
 
     text = " ".join(text_parts).strip()
-    # Normalize whitespace
     text = " ".join(text.split())
 
-    log.info("Transcribed (%s, %.1fs): %s", info.language, info.duration, text[:80])
+    t2 = time.monotonic()
+
+    if language == "auto" and info.language_probability > 0.7:
+        _detected_language = info.language
+
+    log.info(
+        "Transcribed (%s, audio=%.1fs): init=%.1fs decode=%.1fs total=%.1fs | %s",
+        info.language, info.duration,
+        t1 - t0, t2 - t1, t2 - t0,
+        text[:80],
+    )
     return text
 
 
@@ -145,7 +193,6 @@ def download_model(model_name: str) -> bool:
         return True
     except Exception:
         log.exception("Failed to download model %s", model_name)
-        _write_download_status(model_name, "ready")
         return False
 
 
@@ -164,5 +211,6 @@ def delete_model(model_name: str) -> bool:
 
 def unload_model():
     global _model_instance, _model_name
-    _model_instance = None
-    _model_name = None
+    with _model_lock:
+        _model_instance = None
+        _model_name = None
