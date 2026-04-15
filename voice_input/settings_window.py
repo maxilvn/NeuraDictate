@@ -213,9 +213,6 @@ def draw_tab(name, active):
     font = (FONT, 11, "bold") if active else (FONT, 11)
     c.create_text(TAB_W//2, TAB_H//2, text=name.title(), fill=fg, font=font)
 
-content_area = tk.Frame(root, bg=BG)
-content_area.pack(fill="both", expand=True, padx=0, pady=(10, 16))
-
 def switch_tab(name):
     current_tab.set(name)
     tab_frames[name].tkraise()
@@ -224,16 +221,15 @@ def switch_tab(name):
     if name == "settings":
         refresh_model_dropdown()
 
-for tname in ["settings", "models", "history"]:
+for tname in ["settings", "history", "models"]:
     c = tk.Canvas(tab_bar, width=TAB_W, height=TAB_H, bg=BG, highlightthickness=0, bd=0, cursor="")
     c.pack(side="left", padx=(0, 4))
     c.bind("<Button-1>", lambda e, n=tname: switch_tab(n))
     tab_canvases[tname] = c
 
-# ── Status line ──
-sep(root)
+# ── Status line (under tabs) ──
 status_row = tk.Frame(root, bg=BG)
-status_row.pack(fill="x", padx=20)
+status_row.pack(fill="x", padx=20, pady=(6, 0))
 
 status_dot = tk.Label(status_row, text="\\u25CF", font=(FONT, 8), bg=BG, fg=GREEN)
 status_dot.pack(side="left")
@@ -243,6 +239,9 @@ hotkey_lbl = tk.Label(status_row, text="", font=(MONO, 10), bg=BG, fg=FG3)
 hotkey_lbl.pack(side="right")
 
 sep(root)
+
+content_area = tk.Frame(root, bg=BG)
+content_area.pack(fill="both", expand=True, padx=0, pady=(6, 16))
 
 # ════════════════════════════════════════
 # AUTOSAVE

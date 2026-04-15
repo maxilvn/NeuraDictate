@@ -75,10 +75,14 @@ class _MacHud:
         self._label = None
         self._dot_label = None
         self._hide_timer = None
+        self._pulse_timer = None
+        self._pulse_growing = True
+        self._pulse_size = 13
         self._font = None
         self._dot_font = None
         self._label_height = None
         self._dot_width = None
+        self._current_state = None
 
     def start(self) -> None:
         pass
@@ -100,9 +104,9 @@ class _MacHud:
             False,
         )
         self._panel.setLevel_(AppKit.NSFloatingWindowLevel + 1)
-        self._panel.setOpaque_(False)
-        self._panel.setBackgroundColor_(AppKit.NSColor.clearColor())
-        self._panel.setAlphaValue_(0.88)
+        self._panel.setOpaque_(True)
+        self._panel.setBackgroundColor_(AppKit.NSColor.whiteColor())
+        self._panel.setAlphaValue_(0.95)
         self._panel.setHasShadow_(True)
         self._panel.setCollectionBehavior_(
             AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -156,7 +160,11 @@ class _MacHud:
             if self._hide_timer:
                 self._hide_timer.invalidate()
                 self._hide_timer = None
+            if self._pulse_timer:
+                self._pulse_timer.invalidate()
+                self._pulse_timer = None
 
+            self._current_state = state
             bg_hex, fg_hex = _COLORS.get(state, _COLORS[HudState.ERROR])
             dot_hex = _DOTS.get(state, _DOTS[HudState.ERROR])
             text = message or _LABELS.get(state, state)
@@ -165,10 +173,15 @@ class _MacHud:
             fg = _hex_to_nscolor(fg_hex)
             dot_color = _hex_to_nscolor(dot_hex)
 
+            # Use "N" for transcribing, dot for others
+            dot_char = "N" if state == HudState.TRANSCRIBING else "\\u25CF"
+            dot_font_size = self._pulse_size if state == HudState.TRANSCRIBING else 13
+            dot_font = AppKit.NSFont.systemFontOfSize_weight_(dot_font_size, 0.7)
+
             dot_str = NSAttributedString.alloc().initWithString_attributes_(
-                "●",
+                dot_char,
                 {
-                    AppKit.NSFontAttributeName: self._dot_font,
+                    AppKit.NSFontAttributeName: dot_font,
                     AppKit.NSForegroundColorAttributeName: dot_color,
                 }
             )
@@ -183,9 +196,9 @@ class _MacHud:
             content_w = dot_size.width + DOT_GAP + text_size.width
 
             self._panel.contentView().layer().setBackgroundColor_(bg.CGColor())
-            self._dot_label.setStringValue_("●")
+            self._dot_label.setStringValue_(dot_char)
             self._dot_label.setTextColor_(dot_color)
-            self._dot_label.setFont_(self._dot_font)
+            self._dot_label.setFont_(dot_font)
             self._label.setStringValue_(text)
             self._label.setTextColor_(fg)
             self._label.setFont_(self._font)
@@ -204,6 +217,26 @@ class _MacHud:
             self._panel.display()
             self._panel.orderFront_(None)
 
+            if state == HudState.TRANSCRIBING:
+                self._pulse_growing = True
+                self._pulse_size = 13
+                def _pulse(_):
+                    if self._current_state != HudState.TRANSCRIBING:
+                        return
+                    if self._pulse_growing:
+                        self._pulse_size += 1
+                        if self._pulse_size >= 17:
+                            self._pulse_growing = False
+                    else:
+                        self._pulse_size -= 1
+                        if self._pulse_size <= 11:
+                            self._pulse_growing = True
+                    pf = AppKit.NSFont.systemFontOfSize_weight_(self._pulse_size, 0.7)
+                    self._dot_label.setFont_(pf)
+                    self._dot_label.setNeedsDisplay_(True)
+                self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
+                    0.12, True, _pulse)
+
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
                     1.5, False, lambda _: self.hide()
@@ -217,6 +250,10 @@ class _MacHud:
 
     def hide(self) -> None:
         def _do_hide():
+            if self._pulse_timer:
+                self._pulse_timer.invalidate()
+                self._pulse_timer = None
+            self._current_state = None
             if self._panel:
                 self._panel.orderOut_(None)
 
