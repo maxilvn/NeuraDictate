@@ -477,6 +477,12 @@ def _build_settings_script(cfg: dict) -> str:
             if not status.get("active", True):
                 state = "Paused"
             status_var.set(state)
+            if status.get("state") == "downloading":
+                status_label.config(fg="#FFA726")  # Orange
+            elif status.get("state") == "loading":
+                status_label.config(fg="#42A5F5")  # Blue
+            else:
+                status_label.config(fg=FG)
             detail_var.set(status.get("detail", ""))
             updated = status.get("updated_at", "")
             hotkey = status.get("hotkey", "")

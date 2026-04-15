@@ -1,7 +1,9 @@
 """Transcription via faster-whisper with GPU→CPU fallback."""
 
+import json
 import logging
 import os
+from datetime import datetime
 
 from . import config
 
@@ -11,6 +13,40 @@ _model_instance = None
 _model_name = None
 
 
+def _write_download_status(model_name: str, state: str):
+    """Write model loading status so control panel can show it."""
+    try:
+        status = {}
+        if config.STATUS_PATH.exists():
+            status = json.loads(config.STATUS_PATH.read_text(encoding="utf-8"))
+        if state == "downloading":
+            status["state"] = "downloading"
+            status["detail"] = f"Downloading model: {model_name}..."
+        elif state == "loading":
+            status["state"] = "loading"
+            status["detail"] = f"Loading model: {model_name}..."
+        elif state == "ready":
+            status["state"] = "hidden"
+            status["detail"] = "Ready"
+        status["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        config.STATUS_PATH.write_text(
+            json.dumps(status, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def _is_model_downloaded(model_name: str) -> bool:
+    """Check if model is already downloaded in MODEL_DIR."""
+    if not config.MODEL_DIR.exists():
+        return False
+    for entry in config.MODEL_DIR.iterdir():
+        if entry.is_dir() and model_name in entry.name:
+            return True
+    return False
+
+
 def _load_model(model_name: str, use_gpu: bool):
     from faster_whisper import WhisperModel
 
@@ -18,12 +54,21 @@ def _load_model(model_name: str, use_gpu: bool):
     compute_type = "float16" if use_gpu else "int8"
 
     log.info("Loading model %s on %s...", model_name, device)
-    return WhisperModel(
+
+    if _is_model_downloaded(model_name):
+        _write_download_status(model_name, "loading")
+    else:
+        _write_download_status(model_name, "downloading")
+
+    model = WhisperModel(
         model_name,
         device=device,
         compute_type=compute_type,
         download_root=str(config.MODEL_DIR),
     )
+
+    _write_download_status(model_name, "ready")
+    return model
 
 
 def get_model(cfg: dict):
