@@ -163,10 +163,16 @@ def transcribe(wav_path: str, cfg: dict) -> str:
 
     global _detected_language
 
-    language = cfg.get("language", "auto")
+    output_language = cfg.get("language", "auto")
     kwargs = {}
-    if language != "auto":
-        kwargs["language"] = language
+    task = "transcribe"
+
+    if output_language == "en":
+        # Translate any language to English
+        task = "translate"
+    elif output_language not in ("auto", ""):
+        # Force specific output language
+        kwargs["language"] = output_language
     elif _detected_language:
         kwargs["language"] = _detected_language
 
@@ -175,6 +181,7 @@ def transcribe(wav_path: str, cfg: dict) -> str:
     segments, info = model.transcribe(
         wav_path,
         beam_size=1,
+        task=task,
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=300),
         **kwargs,
@@ -192,7 +199,7 @@ def transcribe(wav_path: str, cfg: dict) -> str:
 
     t2 = time.monotonic()
 
-    if language == "auto" and info.language_probability > 0.7:
+    if output_language == "auto" and info.language_probability > 0.7:
         _detected_language = info.language
 
     log.info(

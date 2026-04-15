@@ -181,10 +181,10 @@ class _MacHud:
             dot_color = _hex_to_nscolor(dot_hex)
 
             text_str = NSAttributedString.alloc().initWithString_attributes_(
-                text, {{
+                text, {
                     AppKit.NSFontAttributeName: self._font,
                     AppKit.NSForegroundColorAttributeName: fg,
-                }}
+                }
             )
             text_size = text_str.size()
             icon_s = 16
