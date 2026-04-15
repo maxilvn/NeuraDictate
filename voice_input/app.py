@@ -44,8 +44,13 @@ class VoiceInputApp:
 
     def run(self) -> None:
         if not self._acquire_single_instance():
-            log.info("Another instance is already running; opening control panel only")
-            self._open_control_panel(blocking=True)
+            log.info("Another instance is already running; signaling it to open panel")
+            # Signal the running instance to open its panel
+            try:
+                signal_path = config.CACHE_DIR / "open_panel"
+                signal_path.write_text("1")
+            except OSError:
+                pass
             return
 
         log.info("%s starting...", config.APP_NAME)
@@ -193,10 +198,15 @@ class VoiceInputApp:
             pass
 
         def watch():
+            signal_path = config.CACHE_DIR / "open_panel"
             while True:
                 import time
                 time.sleep(2)
                 try:
+                    # Check if another instance wants us to open the panel
+                    if signal_path.exists():
+                        signal_path.unlink()
+                        self._open_control_panel()
                     if not config.CONFIG_PATH.exists():
                         continue
                     mtime = config.CONFIG_PATH.stat().st_mtime
