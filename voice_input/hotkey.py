@@ -89,9 +89,36 @@ class _MacHotkeyListener:
         self._tap = None
         self._loop_ref = None
         self._source = None
-        self._keycode, self._flag = self._KEY_MAP.get(hotkey_str, (63, 0x800000))
-        log.info("MacHotkeyListener init: key=%s keycode=%d flag=0x%x",
-                 hotkey_str, self._keycode, self._flag)
+        self._is_modifier = hotkey_str in self._KEY_MAP
+        if self._is_modifier:
+            self._keycode, self._flag = self._KEY_MAP[hotkey_str]
+        else:
+            # Normal key — resolve keycode from char
+            self._keycode = self._char_to_keycode(hotkey_str)
+            self._flag = 0
+        log.info("MacHotkeyListener init: key=%s keycode=%d modifier=%s",
+                 hotkey_str, self._keycode, self._is_modifier)
+
+    @staticmethod
+    def _char_to_keycode(char):
+        """Map a character to macOS virtual keycode."""
+        _CHAR_MAP = {
+            'a': 0, 'b': 11, 'c': 8, 'd': 2, 'e': 14, 'f': 3, 'g': 5,
+            'h': 4, 'i': 34, 'j': 38, 'k': 40, 'l': 37, 'm': 46, 'n': 45,
+            'o': 31, 'p': 35, 'q': 12, 'r': 15, 's': 1, 't': 17, 'u': 32,
+            'v': 9, 'w': 13, 'x': 7, 'y': 16, 'z': 6,
+            '1': 18, '2': 19, '3': 20, '4': 21, '5': 23,
+            '6': 22, '7': 26, '8': 28, '9': 25, '0': 29,
+        }
+        # Handle Key.f1-Key.f12
+        if char.startswith("Key.f") and char[5:].isdigit():
+            fnum = int(char[5:])
+            f_codes = {1:122, 2:120, 3:99, 4:118, 5:96, 6:97,
+                       7:98, 8:100, 9:101, 10:109, 11:103, 12:111}
+            return f_codes.get(fnum, 122)
+        if char.startswith("Key.esc"):
+            return 53
+        return _CHAR_MAP.get(char.lower(), 0)
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -102,10 +129,12 @@ class _MacHotkeyListener:
 
         keycode = self._keycode
         flag = self._flag
+        is_modifier = self._is_modifier
 
         def callback(proxy, event_type, event, refcon):
             # Re-enable tap if macOS disabled it
-            if event_type != Quartz.kCGEventFlagsChanged:
+            if event_type not in (Quartz.kCGEventFlagsChanged,
+                                   Quartz.kCGEventKeyDown, Quartz.kCGEventKeyUp):
                 try:
                     if self._tap:
                         Quartz.CGEventTapEnable(self._tap, True)
@@ -114,26 +143,37 @@ class _MacHotkeyListener:
                 return event
 
             ev_keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
-            flags = Quartz.CGEventGetFlags(event)
 
-            if ev_keycode == keycode:
-                key_pressed = bool(flags & flag)
-                if key_pressed and not self._key_down:
-                    self._key_down = True
-                    try:
-                        self._on_press()
-                    except Exception:
-                        log.exception("Error in on_press")
-                elif not key_pressed and self._key_down:
-                    self._key_down = False
-                    try:
-                        self._on_release()
-                    except Exception:
-                        log.exception("Error in on_release")
+            if is_modifier:
+                # Modifier key: use FlagsChanged
+                if event_type == Quartz.kCGEventFlagsChanged and ev_keycode == keycode:
+                    flags = Quartz.CGEventGetFlags(event)
+                    key_pressed = bool(flags & flag)
+                    if key_pressed and not self._key_down:
+                        self._key_down = True
+                        try: self._on_press()
+                        except Exception: log.exception("Error in on_press")
+                    elif not key_pressed and self._key_down:
+                        self._key_down = False
+                        try: self._on_release()
+                        except Exception: log.exception("Error in on_release")
+            else:
+                # Normal key: use KeyDown/KeyUp
+                if ev_keycode == keycode:
+                    if event_type == Quartz.kCGEventKeyDown and not self._key_down:
+                        self._key_down = True
+                        try: self._on_press()
+                        except Exception: log.exception("Error in on_press")
+                    elif event_type == Quartz.kCGEventKeyUp and self._key_down:
+                        self._key_down = False
+                        try: self._on_release()
+                        except Exception: log.exception("Error in on_release")
 
             return event
 
-        event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+        event_mask = (Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+                      | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
+                      | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp))
         self._tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
             Quartz.kCGHeadInsertEventTap,
