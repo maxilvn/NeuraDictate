@@ -271,7 +271,7 @@ def make_combo(parent, values, display_map, current):
 
 # Hotkey
 field_label(sf, "Hotkey")
-hotkey_var, hotkey_map, _ = make_combo(
+_hk_var, hotkey_map, _ = make_combo(
     sf, list(hotkeys.keys()), hotkeys,
     cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"))
 sep(sf)
@@ -285,7 +285,7 @@ available = [m for m in models if m in downloaded] or models[:1]
 cur_model = cfg.get("model", "small")
 if cur_model not in available:
     cur_model = available[0]
-model_var, _, model_cb = make_combo(model_frame, available, {{}}, cur_model)
+_md_var, _, model_cb = make_combo(model_frame, available, {{}}, cur_model)
 no_models_lbl = None
 if not downloaded:
     no_models_lbl = tk.Label(sf, text="No models yet. Go to Models tab to download.",
@@ -298,11 +298,11 @@ def refresh_model_dropdown():
     global no_models_lbl
     dl = get_downloaded()
     avail = [m for m in models if m in dl] or models[:1]
-    cur = model_var[0].get()
+    cur = _md_var.get()
     if cur not in avail:
         cur = avail[0]
     model_cb.config(values=avail)
-    model_var[0].set(cur)
+    _md_var.set(cur)
     if no_models_lbl:
         if dl:
             no_models_lbl.pack_forget()
@@ -311,7 +311,7 @@ def refresh_model_dropdown():
 
 # Language
 field_label(sf, "Language")
-lang_var, lang_map, _ = make_combo(sf, langs, lang_names, cfg.get("language", "auto"))
+_lg_var, lang_map, _ = make_combo(sf, langs, lang_names, cfg.get("language", "auto"))
 sep(sf)
 
 # Toggles
@@ -329,10 +329,10 @@ ttk.Checkbutton(sf, text="Use GPU (CUDA)", variable=gpu_var).pack(
 def on_close():
     result = dict(cfg)
     rev_hk = {{v: k for k, v in hotkeys.items()}}
-    result["hotkey"] = rev_hk.get(hotkey_var[0].get(), hotkey_var[0].get())
-    result["model"] = model_var[0].get()
+    result["hotkey"] = rev_hk.get(_hk_var.get(), _hk_var.get())
+    result["model"] = _md_var.get()
     rev_lang = {{v: k for k, v in lang_names.items()}}
-    result["language"] = rev_lang.get(lang_var[0].get(), lang_var[0].get())
+    result["language"] = rev_lang.get(_lg_var.get(), _lg_var.get())
     result["auto_paste"] = paste_var.get()
     result["gpu_enabled"] = gpu_var.get()
     print(json.dumps(result))
