@@ -246,7 +246,7 @@ def field_label(parent, text):
 
 class PillSelect:
     \"\"\"Canvas pill with popup menu on click.\"\"\"
-    PW, PH = 240, 30
+    PW, PH = 180, 26
 
     def __init__(self, parent, values, current, on_change=None):
         self._values = list(values)
@@ -261,9 +261,9 @@ class PillSelect:
     def _draw(self):
         self.c.delete("all")
         rr(self.c, 0, 0, self.PW, self.PH, self.PH//2, fill=CTRL, outline="")
-        self.c.create_text(16, self.PH//2, text=self._values[self._idx],
-                           fill=FG, font=(FONT, 11), anchor="w")
-        self.c.create_text(self.PW-18, self.PH//2, text="\\u25BE", fill=FG2, font=(FONT, 10))
+        self.c.create_text(14, self.PH//2, text=self._values[self._idx],
+                           fill=FG, font=(FONT, 10), anchor="w")
+        self.c.create_text(self.PW-14, self.PH//2, text="\\u25BE", fill=FG2, font=(FONT, 9))
 
     def _open_menu(self, event):
         menu = tk.Menu(self.c, tearoff=0, bg=CTRL, fg=FG, font=(FONT, 11),
@@ -293,7 +293,7 @@ class PillSelect:
 
 class Toggle:
     \"\"\"Canvas-based oval toggle switch.\"\"\"
-    W, H = 42, 24
+    W, H = 34, 18
 
     def __init__(self, parent, label, current, on_change=None):
         self._on = current
@@ -302,16 +302,16 @@ class Toggle:
         self.c = tk.Canvas(self.frame, width=self.W, height=self.H,
                            bg=BG, highlightthickness=0, bd=0, cursor="hand2")
         self.c.pack(side="left")
-        tk.Label(self.frame, text=label, font=(FONT, 11), bg=BG, fg=FG).pack(side="left", padx=(10, 0))
+        tk.Label(self.frame, text=label, font=(FONT, 11), bg=BG, fg=FG).pack(side="left", padx=(8, 0))
         self._draw()
         self.c.bind("<Button-1>", self._toggle)
 
     def _draw(self):
         self.c.delete("all")
-        bg = ACCENT if self._on else SEP
+        bg = GREEN if self._on else SEP
         rr(self.c, 0, 0, self.W, self.H, self.H//2, fill=bg, outline="")
-        cx = self.W - 12 if self._on else 12
-        self.c.create_oval(cx-9, 3, cx+9, self.H-3, fill="white", outline="")
+        cx = self.W - 9 if self._on else 9
+        self.c.create_oval(cx-6, 3, cx+6, self.H-3, fill="white", outline="")
 
     def _toggle(self, _e=None):
         self._on = not self._on
@@ -518,9 +518,11 @@ def build_history():
         card_canvas.create_text(14, 36, text=text, fill=FG, font=text_font,
                                  anchor="nw", width=card_w - 90)
 
-        # Copy button drawn on card
-        bx, by, bw, bh = card_w - 70, 8, 56, 22
-        rr(card_canvas, bx, by, bx+bw, by+bh, 6, fill=CTRL_HL, outline="", tags="copybg")
+        # Copy button — pill shaped, vertically centered
+        bw, bh = 52, 22
+        bx = card_w - bw - 14
+        by = (card_h - bh) // 2
+        rr(card_canvas, bx, by, bx+bw, by+bh, bh//2, fill=CTRL_HL, outline="", tags="copybg")
         card_canvas.create_text(bx+bw//2, by+bh//2, text="Copy", fill=FG2,
                                  font=(FONT, 9), tags="copytxt")
 
@@ -533,10 +535,12 @@ def build_history():
                     root.clipboard_clear()
                     root.clipboard_append(t)
                 cv.delete("copytxt")
-                cv.create_text(bx+bw//2, by+bh//2, text="Copied", fill=GREEN,
+                # Recalc center since bx/by are closure-captured per card
+                _bx, _bh2 = bx, by
+                cv.create_text(_bx+bw//2, _bh2+bh//2, text="Copied", fill=GREEN,
                                 font=(FONT, 9), tags="copytxt")
                 root.after(1000, lambda: [cv.delete("copytxt"),
-                    cv.create_text(bx+bw//2, by+bh//2, text="Copy", fill=FG2,
+                    cv.create_text(_bx+bw//2, _bh2+bh//2, text="Copy", fill=FG2,
                                     font=(FONT, 9), tags="copytxt")])
             return do_copy
 
