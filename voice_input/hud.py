@@ -74,15 +74,17 @@ class _MacHud:
         self._panel = None
         self._label = None
         self._dot_label = None
+        self._icon_view = None
         self._hide_timer = None
         self._pulse_timer = None
         self._pulse_growing = True
-        self._pulse_size = 13
+        self._pulse_size = 14
         self._font = None
         self._dot_font = None
         self._label_height = None
         self._dot_width = None
         self._current_state = None
+        self._neura_icon = None
 
     def start(self) -> None:
         pass
@@ -117,6 +119,11 @@ class _MacHud:
         content.setWantsLayer_(True)
         content.layer().setCornerRadius_(PILL_HEIGHT / 2)
         content.layer().setMasksToBounds_(True)
+
+        # Load Neura icon for transcribing state
+        from pathlib import Path
+        icon_path = str(Path(__file__).resolve().parent.parent / "icon.png")
+        self._neura_icon = AppKit.NSImage.alloc().initWithContentsOfFile_(icon_path)
         self._font = AppKit.NSFont.systemFontOfSize_weight_(12, 0.3)
         self._dot_font = AppKit.NSFont.systemFontOfSize_weight_(13, 0.5)
         self._label_height = self._font.ascender() - self._font.descender() + self._font.leading() + 4
@@ -173,10 +180,8 @@ class _MacHud:
             fg = _hex_to_nscolor(fg_hex)
             dot_color = _hex_to_nscolor(dot_hex)
 
-            # Use "N" for transcribing, dot for others
-            dot_char = "N" if state == HudState.TRANSCRIBING else "\u25CF"
-            dot_font_size = self._pulse_size if state == HudState.TRANSCRIBING else 13
-            dot_font = AppKit.NSFont.systemFontOfSize_weight_(dot_font_size, 0.7)
+            dot_char = "\u25CF"
+            dot_font = self._dot_font
 
             dot_str = NSAttributedString.alloc().initWithString_attributes_(
                 dot_char,
@@ -196,9 +201,25 @@ class _MacHud:
             content_w = dot_size.width + DOT_GAP + text_size.width
 
             self._panel.contentView().layer().setBackgroundColor_(bg.CGColor())
-            self._dot_label.setStringValue_(dot_char)
-            self._dot_label.setTextColor_(dot_color)
-            self._dot_label.setFont_(dot_font)
+
+            # Remove old icon view if present
+            if self._icon_view:
+                self._icon_view.removeFromSuperview()
+                self._icon_view = None
+
+            if state == HudState.TRANSCRIBING and self._neura_icon:
+                # Hide dot, show icon
+                self._dot_label.setStringValue_("")
+                icon_size = self._pulse_size
+                self._icon_view = AppKit.NSImageView.alloc().initWithFrame_(
+                    ((0, 0), (icon_size, icon_size)))
+                self._icon_view.setImage_(self._neura_icon)
+                self._icon_view.setImageScaling_(AppKit.NSImageScaleProportionallyUpOrDown)
+                self._panel.contentView().addSubview_(self._icon_view)
+            else:
+                self._dot_label.setStringValue_(dot_char)
+                self._dot_label.setTextColor_(dot_color)
+                self._dot_label.setFont_(dot_font)
             self._label.setStringValue_(text)
             self._label.setTextColor_(fg)
             self._label.setFont_(self._font)
@@ -217,25 +238,29 @@ class _MacHud:
             self._panel.display()
             self._panel.orderFront_(None)
 
-            if state == HudState.TRANSCRIBING:
+            if state == HudState.TRANSCRIBING and self._icon_view:
                 self._pulse_growing = True
-                self._pulse_size = 13
+                self._pulse_size = 14
+                # Position icon initially
+                iy = (PILL_HEIGHT - self._pulse_size) / 2
+                self._icon_view.setFrame_(((content_x, iy), (self._pulse_size, self._pulse_size)))
                 def _pulse(_):
-                    if self._current_state != HudState.TRANSCRIBING:
+                    if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
                     if self._pulse_growing:
-                        self._pulse_size += 1
-                        if self._pulse_size >= 17:
+                        self._pulse_size += 0.5
+                        if self._pulse_size >= 18:
                             self._pulse_growing = False
                     else:
-                        self._pulse_size -= 1
-                        if self._pulse_size <= 11:
+                        self._pulse_size -= 0.5
+                        if self._pulse_size <= 12:
                             self._pulse_growing = True
-                    pf = AppKit.NSFont.systemFontOfSize_weight_(self._pulse_size, 0.7)
-                    self._dot_label.setFont_(pf)
-                    self._dot_label.setNeedsDisplay_(True)
+                    s = self._pulse_size
+                    iy = (PILL_HEIGHT - s) / 2
+                    self._icon_view.setFrame_(((content_x, iy), (s, s)))
+                    self._icon_view.setNeedsDisplay_(True)
                 self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
-                    0.12, True, _pulse)
+                    0.08, True, _pulse)
 
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
