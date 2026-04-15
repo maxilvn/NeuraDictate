@@ -213,14 +213,14 @@ def draw_tab(name, active):
     font = (FONT, 11, "bold") if active else (FONT, 11)
     c.create_text(TAB_W//2, TAB_H//2, text=name.title(), fill=fg, font=font)
 
+content_area = tk.Frame(root, bg=BG)
+content_area.pack(fill="both", expand=True, padx=0, pady=(10, 16))
+
 def switch_tab(name):
     current_tab.set(name)
-    for n, f in tab_frames.items():
-        f.pack_forget()
-    tab_frames[name].pack(fill="both", expand=True, padx=0, pady=(10, 16))
+    tab_frames[name].tkraise()
     for n in tab_canvases:
         draw_tab(n, n == name)
-    # Refresh model dropdown when switching to settings (picks up new downloads)
     if name == "settings":
         refresh_model_dropdown()
 
@@ -272,7 +272,8 @@ def schedule_save(*_a):
 # ════════════════════════════════════════
 # TAB: Settings
 # ════════════════════════════════════════
-sf = tk.Frame(root, bg=BG)
+sf = tk.Frame(content_area, bg=BG)
+sf.place(relx=0, rely=0, relwidth=1, relheight=1)
 tab_frames["settings"] = sf
 
 def field_label(parent, text):
@@ -410,7 +411,8 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 # ════════════════════════════════════════
 # TAB: Models
 # ════════════════════════════════════════
-mf = tk.Frame(root, bg=BG)
+mf = tk.Frame(content_area, bg=BG)
+mf.place(relx=0, rely=0, relwidth=1, relheight=1)
 tab_frames["models"] = mf
 
 m_canvas = tk.Canvas(mf, bg=BG, highlightthickness=0, bd=0)
@@ -491,7 +493,8 @@ build_models()
 # ════════════════════════════════════════
 # TAB: History
 # ════════════════════════════════════════
-hf = tk.Frame(root, bg=BG)
+hf = tk.Frame(content_area, bg=BG)
+hf.place(relx=0, rely=0, relwidth=1, relheight=1)
 tab_frames["history"] = hf
 
 h_canvas = tk.Canvas(hf, bg=BG, highlightthickness=0, bd=0)
