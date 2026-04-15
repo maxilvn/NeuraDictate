@@ -65,6 +65,10 @@ if __name__ == "__main__":
                 start_new_session=True,
                 env=env,
             )
+            # Close the Terminal window that launched us
+            subprocess.Popen(["osascript", "-e",
+                'tell application "Terminal" to close front window'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             sys.exit(0)
     elif not _HEADLESS and sys.platform == "win32":
         _exe = os.path.basename(sys.executable).lower()
