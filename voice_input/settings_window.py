@@ -403,7 +403,7 @@ def refresh_model_dropdown():
 
 # Language
 field_label(sf, "Language")
-lg_display = ["Auto (Deutsch)", "Deutsch", "English", "Français", "Español"]
+lg_display = ["Auto", "Deutsch", "English (translate)", "Français", "Español"]
 lg_keys = ["auto", "de", "en", "fr", "es"]
 lg_map = dict(zip(lg_keys, lg_display))
 lg_cur = lg_map.get(cfg.get("language", "auto"), "Auto (Deutsch)")

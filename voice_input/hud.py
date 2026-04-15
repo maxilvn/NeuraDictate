@@ -251,8 +251,8 @@ class _MacHud:
                 def _bounce(_):
                     if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
-                    self._bounce_t += 0.15
-                    offset = math.sin(self._bounce_t) * 3
+                    self._bounce_t += 0.07
+                    offset = math.sin(self._bounce_t) * 2.5
                     self._icon_view.setFrame_(((content_x, base_y + offset), (icon_s, icon_s)))
                     self._icon_view.setNeedsDisplay_(True)
                 self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
