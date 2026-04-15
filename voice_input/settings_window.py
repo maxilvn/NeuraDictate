@@ -387,48 +387,93 @@ def _draw_hk():
     hk_canvas.create_text(HK_W//2, HK_H//2, text=_hk_name[0], fill=FG, font=(FONT, 10))
 _draw_hk()
 
-# "Record" button
-_recording_hk = [False]
-
+# "Record" button — uses Quartz on macOS for correct key detection
 def _start_record():
-    _recording_hk[0] = True
     hk_canvas.delete("all")
     rr(hk_canvas, 0, 0, HK_W, HK_H, HK_H//2, fill=ACCENT, outline="")
     hk_canvas.create_text(HK_W//2, HK_H//2, text="Press a key...", fill="white", font=(FONT, 10))
-    root.focus_set()
-    root.bind("<Key>", _on_key_record)
 
-def _on_key_record(event):
-    if not _recording_hk[0]:
-        return
-    _recording_hk[0] = False
-    root.unbind("<Key>")
+    def _record_thread():
+        if is_mac:
+            import Quartz
+            # Reverse map: keycode -> (key_id, display_name)
+            _CODE_MAP = {{
+                63: ("fn", "Fn"),
+                58: ("Key.alt_l", "Left Option"), 61: ("Key.alt_r", "Right Option"),
+                55: ("Key.cmd_l", "Left Command"), 54: ("Key.cmd_r", "Right Command"),
+                59: ("Key.ctrl_l", "Left Control"), 62: ("Key.ctrl_r", "Right Control"),
+                56: ("Key.shift_l", "Left Shift"), 60: ("Key.shift_r", "Right Shift"),
+                57: ("Key.caps_lock", "Caps Lock"),
+                53: ("Key.esc", "Escape"),
+                122: ("Key.f1","F1"), 120: ("Key.f2","F2"), 99: ("Key.f3","F3"),
+                118: ("Key.f4","F4"), 96: ("Key.f5","F5"), 97: ("Key.f6","F6"),
+                98: ("Key.f7","F7"), 100: ("Key.f8","F8"), 101: ("Key.f9","F9"),
+                109: ("Key.f10","F10"), 103: ("Key.f11","F11"), 111: ("Key.f12","F12"),
+                # Letters
+                0: ("a","A"), 11: ("b","B"), 8: ("c","C"), 2: ("d","D"),
+                14: ("e","E"), 3: ("f","F"), 5: ("g","G"), 4: ("h","H"),
+                34: ("i","I"), 38: ("j","J"), 40: ("k","K"), 37: ("l","L"),
+                46: ("m","M"), 45: ("n","N"), 31: ("o","O"), 35: ("p","P"),
+                12: ("q","Q"), 15: ("r","R"), 1: ("s","S"), 17: ("t","T"),
+                32: ("u","U"), 9: ("v","V"), 13: ("w","W"), 7: ("x","X"),
+                16: ("y","Y"), 6: ("z","Z"),
+            }}
+            detected = [None]
+            def tap_callback(proxy, event_type, event, refcon):
+                kc = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
+                if kc in _CODE_MAP:
+                    detected[0] = _CODE_MAP[kc]
+                else:
+                    detected[0] = (str(kc), f"Key {{kc}}")
+                Quartz.CFRunLoopStop(Quartz.CFRunLoopGetCurrent())
+                return event
 
-    key_name = event.keysym
-    # Map to pynput-style key string
-    key_map = {{
-        "Fn": "fn", "fn": "fn",
-        "Alt_R": "Key.alt_r", "Alt_L": "Key.alt_l",
-        "Control_L": "Key.ctrl_l", "Control_R": "Key.ctrl_r",
-        "Super_R": "Key.cmd_r", "Super_L": "Key.cmd_l",
-        "Caps_Lock": "Key.caps_lock",
-        "Shift_L": "Key.shift_l", "Shift_R": "Key.shift_r",
-        "Escape": "Key.esc",
-        "F1": "Key.f1", "F2": "Key.f2", "F3": "Key.f3", "F4": "Key.f4",
-        "F5": "Key.f5", "F6": "Key.f6", "F7": "Key.f7", "F8": "Key.f8",
-        "F9": "Key.f9", "F10": "Key.f10", "F11": "Key.f11", "F12": "Key.f12",
-    }}
-    key_id = key_map.get(key_name, key_name)
-    display = key_name.replace("_", " ")
+            mask = (Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+                    | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown))
+            tap = Quartz.CGEventTapCreate(
+                Quartz.kCGSessionEventTap, Quartz.kCGHeadInsertEventTap,
+                Quartz.kCGEventTapOptionListenOnly, mask, tap_callback, None)
+            if tap:
+                src = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
+                loop = Quartz.CFRunLoopGetCurrent()
+                Quartz.CFRunLoopAddSource(loop, src, Quartz.kCFRunLoopDefaultMode)
+                Quartz.CGEventTapEnable(tap, True)
+                Quartz.CFRunLoopRun()
+                Quartz.CGEventTapEnable(tap, False)
 
-    # Add to hotkeys dict if new
-    if key_id not in hotkeys:
-        hotkeys[key_id] = display
+            if detected[0]:
+                key_id, display = detected[0]
+                root.after(0, lambda: _apply_key(key_id, display))
+        else:
+            # Windows: use pynput
+            from pynput import keyboard
+            detected = [None]
+            def on_press(key):
+                try:
+                    if hasattr(key, 'char') and key.char:
+                        detected[0] = (key.char, key.char.upper())
+                    else:
+                        name = str(key).replace("Key.", "Key.")
+                        display = str(key).replace("Key.", "").replace("_", " ").title()
+                        detected[0] = (name, display)
+                except Exception:
+                    detected[0] = (str(key), str(key))
+                return False
+            with keyboard.Listener(on_press=on_press) as listener:
+                listener.join()
+            if detected[0]:
+                key_id, display = detected[0]
+                root.after(0, lambda: _apply_key(key_id, display))
 
-    _hk_value[0] = key_id
-    _hk_name[0] = hotkeys.get(key_id, display)
-    _draw_hk()
-    schedule_save()
+    def _apply_key(key_id, display):
+        if key_id not in hotkeys:
+            hotkeys[key_id] = display
+        _hk_value[0] = key_id
+        _hk_name[0] = display
+        _draw_hk()
+        schedule_save()
+
+    threading.Thread(target=_record_thread, daemon=True).start()
 
 rec_btn = RBtn(hk_row, "Set new", _start_record, bg_color=CTRL, fg_color=FG2,
                hover=CTRL_HL, w=75, h=26, font_t=(FONT, 10))
