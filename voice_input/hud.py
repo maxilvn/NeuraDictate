@@ -180,46 +180,29 @@ class _MacHud:
             fg = _hex_to_nscolor(fg_hex)
             dot_color = _hex_to_nscolor(dot_hex)
 
-            dot_char = "\u25CF"
-            dot_font = self._dot_font
-
-            dot_str = NSAttributedString.alloc().initWithString_attributes_(
-                dot_char,
-                {
-                    AppKit.NSFontAttributeName: dot_font,
-                    AppKit.NSForegroundColorAttributeName: dot_color,
-                }
-            )
             text_str = NSAttributedString.alloc().initWithString_attributes_(
-                text, {
+                text, {{
                     AppKit.NSFontAttributeName: self._font,
                     AppKit.NSForegroundColorAttributeName: fg,
-                }
+                }}
             )
-            dot_size = dot_str.size()
             text_size = text_str.size()
-            content_w = dot_size.width + DOT_GAP + text_size.width
+            icon_s = 16
+            content_w = icon_s + DOT_GAP + text_size.width
 
             self._panel.contentView().layer().setBackgroundColor_(bg.CGColor())
 
-            # Remove old icon view if present
+            # Always show Neura icon instead of dot
+            self._dot_label.setStringValue_("")
             if self._icon_view:
                 self._icon_view.removeFromSuperview()
-                self._icon_view = None
-
-            if state == HudState.TRANSCRIBING and self._neura_icon:
-                # Hide dot, show icon
-                self._dot_label.setStringValue_("")
-                icon_size = self._pulse_size
-                self._icon_view = AppKit.NSImageView.alloc().initWithFrame_(
-                    ((0, 0), (icon_size, icon_size)))
+            self._icon_view = AppKit.NSImageView.alloc().initWithFrame_(
+                ((0, 0), (icon_s, icon_s)))
+            if self._neura_icon:
                 self._icon_view.setImage_(self._neura_icon)
-                self._icon_view.setImageScaling_(AppKit.NSImageScaleProportionallyUpOrDown)
-                self._panel.contentView().addSubview_(self._icon_view)
-            else:
-                self._dot_label.setStringValue_(dot_char)
-                self._dot_label.setTextColor_(dot_color)
-                self._dot_label.setFont_(dot_font)
+            self._icon_view.setImageScaling_(AppKit.NSImageScaleProportionallyUpOrDown)
+            self._panel.contentView().addSubview_(self._icon_view)
+
             self._label.setStringValue_(text)
             self._label.setTextColor_(fg)
             self._label.setFont_(self._font)
@@ -229,9 +212,10 @@ class _MacHud:
             x = (screen.size.width - pill_w) / 2
             self._panel.setFrame_display_(((x, BOTTOM_MARGIN), (pill_w, PILL_HEIGHT)), True)
             content_x = (pill_w - content_w) / 2
+            icon_y = (PILL_HEIGHT - icon_s) / 2
+            self._icon_view.setFrame_(((content_x, icon_y), (icon_s, icon_s)))
             label_y = (PILL_HEIGHT - self._label_height) / 2
-            self._dot_label.setFrame_(((content_x, label_y), (dot_size.width + 2, self._label_height)))
-            self._label.setFrame_(((content_x + dot_size.width + DOT_GAP, label_y), (text_size.width + 2, self._label_height)))
+            self._label.setFrame_(((content_x + icon_s + DOT_GAP, label_y), (text_size.width + 2, self._label_height)))
             self._panel.contentView().setNeedsDisplay_(True)
             self._dot_label.setNeedsDisplay_(True)
             self._label.setNeedsDisplay_(True)
