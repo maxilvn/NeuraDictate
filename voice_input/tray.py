@@ -22,7 +22,8 @@ class _MacTray:
         self._on_settings = on_settings
         self._on_quit = on_quit
         self._is_active = is_active
-        self._app = rumps.App(config.APP_NAME, title="N")
+        icon_path = str(config.MODULE_DIR.parent / "icon.png")
+        self._app = rumps.App(config.APP_NAME, title=None, icon=icon_path, template=True)
 
     def run(self) -> None:
         import rumps
