@@ -51,6 +51,8 @@ def _build_settings_script(cfg: dict) -> str:
     history_path_json = json.dumps(str(config.TRANSCRIPT_HISTORY_PATH))
     last_path_json = json.dumps(str(config.LAST_TRANSCRIPT_PATH))
     is_mac_json = "True" if sys.platform == "darwin" else "False"
+    model_info_json = json.dumps(config.MODEL_INFO)
+    model_dir_json = json.dumps(str(config.MODEL_DIR))
 
     return textwrap.dedent(
         f"""\
@@ -70,6 +72,8 @@ def _build_settings_script(cfg: dict) -> str:
         history_path = pathlib.Path(json.loads({history_path_json!r}))
         last_path = pathlib.Path(json.loads({last_path_json!r}))
         is_mac = {is_mac_json}
+        model_info = json.loads({model_info_json!r})
+        model_dir = pathlib.Path(json.loads({model_dir_json!r}))
 
         BG = "#161616"
         PANEL = "#1E1E1E"
@@ -112,6 +116,27 @@ def _build_settings_script(cfg: dict) -> str:
             widget.delete("1.0", "end")
             widget.insert("1.0", value.strip())
             widget.config(state="disabled")
+
+        def get_downloaded():
+            downloaded = []
+            if model_dir.exists():
+                for name in models:
+                    for entry in model_dir.iterdir():
+                        if entry.is_dir() and name in entry.name:
+                            downloaded.append(name)
+                            break
+            return downloaded
+
+        downloaded = get_downloaded()
+
+        model_display = {{}}
+        for m in models:
+            label = m
+            if m in downloaded:
+                label += "  [downloaded]"
+            if model_info.get(m, {{}}).get("recommended"):
+                label += "  (recommended)"
+            model_display[m] = label
 
         title = tk.Label(
             root,
@@ -199,8 +224,69 @@ def _build_settings_script(cfg: dict) -> str:
         hotkey_var = add_dropdown(settings_card, "Hotkey", list(hotkeys.keys()), hotkeys, cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"), row)
         row += 2
 
-        model_var = add_dropdown(settings_card, "Model", models, {{}}, cfg.get("model", "large-v3-turbo"), row)
+        model_var = add_dropdown(settings_card, "Model", models, model_display, cfg.get("model", "small"), row)
+        model_row = row
         row += 2
+
+        def show_model_info():
+            popup = tk.Toplevel(root)
+            popup.title("Model Comparison")
+            popup.configure(bg=BG)
+            popup.attributes("-topmost", True)
+            popup.geometry("560x320")
+            popup.resizable(False, False)
+
+            popup.update_idletasks()
+            pw = popup.winfo_width()
+            ph = popup.winfo_height()
+            px = (popup.winfo_screenwidth() - pw) // 2
+            py = (popup.winfo_screenheight() - ph) // 2
+            popup.geometry(f"{{pw}}x{{ph}}+{{px}}+{{py}}")
+
+            header_frame = tk.Frame(popup, bg=PANEL)
+            header_frame.pack(fill="x", padx=12, pady=(12, 0))
+            headers = ["Model", "Size", "Speed", "Quality", "Status"]
+            col_widths = [16, 8, 10, 10, 12]
+            for ci, (htext, cw) in enumerate(zip(headers, col_widths)):
+                tk.Label(
+                    header_frame, text=htext, font=("Helvetica", 10, "bold"),
+                    bg=PANEL, fg=ACCENT, width=cw, anchor="w"
+                ).grid(row=0, column=ci, padx=4, pady=6)
+
+            table_frame = tk.Frame(popup, bg=BG)
+            table_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+            for ri, name in enumerate(models):
+                info = model_info.get(name, {{}})
+                speed = info.get("speed", 0)
+                quality = info.get("quality", 0)
+                speed_stars = "\u2605" * speed + "\u2606" * (5 - speed)
+                quality_stars = "\u2605" * quality + "\u2606" * (5 - quality)
+                status = "Downloaded" if name in downloaded else "\u2014"
+                row_bg = PANEL if ri % 2 == 0 else PANEL_ALT
+                values = [name, info.get("size", "?"), speed_stars, quality_stars, status]
+                for ci, (val, cw) in enumerate(zip(values, col_widths)):
+                    fg_color = ACCENT if val == "Downloaded" else FG
+                    tk.Label(
+                        table_frame, text=val, font=("Helvetica", 10),
+                        bg=row_bg, fg=fg_color, width=cw, anchor="w"
+                    ).grid(row=ri, column=ci, padx=4, pady=3)
+
+            tk.Button(
+                popup, text="Close", command=popup.destroy,
+                bg=FIELD_BG, fg=FG, font=("Helvetica", 10),
+                relief="flat", padx=14, pady=4,
+                activebackground="#3D3D3D", activeforeground=FG,
+            ).pack(pady=(0, 12))
+
+        info_btn = tk.Button(
+            settings_card, text="i", command=show_model_info,
+            bg=FIELD_BG, fg=ACCENT, font=("Helvetica", 10, "bold"),
+            relief="flat", width=3, height=1,
+            activebackground="#3D3D3D", activeforeground=ACCENT,
+        )
+        info_btn.grid(row=model_row + 1, column=1, sticky="e", padx=(0, 16))
+
         lang_var = add_dropdown(settings_card, "Language", langs, lang_names, cfg.get("language", "auto"), row)
         row += 2
 
@@ -285,7 +371,12 @@ def _build_settings_script(cfg: dict) -> str:
             if hotkey_var is not None:
                 reverse = {{v: k for k, v in hotkeys.items()}}
                 result["hotkey"] = reverse.get(hotkey_var[0].get(), hotkey_var[0].get())
-            result["model"] = model_var[0].get()
+            raw_model = model_var[0].get()
+            for m in models:
+                if raw_model.startswith(m):
+                    raw_model = m
+                    break
+            result["model"] = raw_model
             reverse_lang = {{v: k for k, v in lang_names.items()}}
             result["language"] = reverse_lang.get(lang_var[0].get(), lang_var[0].get())
             result["auto_paste"] = paste_var.get()
