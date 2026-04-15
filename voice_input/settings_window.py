@@ -184,18 +184,17 @@ header = tk.Frame(root, bg="white")
 header.pack(fill="x")
 try:
     _logo_img = tk.PhotoImage(file=str(logo_path))
-    # Scale down to ~140px wide
-    sw = max(1, _logo_img.width() // 140)
-    sh = max(1, _logo_img.height() // 140 * (140 // max(1, _logo_img.width() // 140)))
+    # Scale to ~120px wide
+    sw = max(1, _logo_img.width() // 120)
     if sw > 1:
         _logo_img = _logo_img.subsample(sw, sw)
     logo_label = tk.Label(header, image=_logo_img, bg="white")
     logo_label.image = _logo_img
-    logo_label.pack(side="left", padx=20, pady=10)
+    logo_label.pack(side="left", padx=(20, 2), pady=10)
 except Exception:
     pass
-tk.Label(header, text="NeuraDictate", font=(FONT, 11), bg="white", fg="#333333").pack(
-    side="left", padx=(4, 0), pady=10)
+tk.Label(header, text="Dictate", font=(FONT, 14), bg="white", fg="#333333").pack(
+    side="left", pady=10)
 
 # ── Tab bar (rounded pill buttons) ──
 tab_bar = tk.Frame(root, bg=BG)
