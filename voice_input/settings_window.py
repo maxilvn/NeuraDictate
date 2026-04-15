@@ -245,30 +245,36 @@ def field_label(parent, text):
         anchor="w", padx=22, pady=(12, 4))
 
 class PillSelect:
-    \"\"\"Canvas-based pill dropdown selector.\"\"\"
-    PILL_W, PILL_H, PILL_R = 280, 34, 12
+    \"\"\"Canvas pill with popup menu on click.\"\"\"
+    PW, PH = 240, 30
 
     def __init__(self, parent, values, current, on_change=None):
         self._values = list(values)
         self._idx = self._values.index(current) if current in self._values else 0
         self._on_change = on_change
-        self.c = tk.Canvas(parent, width=self.PILL_W, height=self.PILL_H,
+        self._parent = parent
+        self.c = tk.Canvas(parent, width=self.PW, height=self.PH,
                            bg=BG, highlightthickness=0, bd=0, cursor="hand2")
         self._draw()
-        self.c.bind("<Button-1>", self._cycle)
+        self.c.bind("<Button-1>", self._open_menu)
 
     def _draw(self):
         self.c.delete("all")
-        rr(self.c, 0, 0, self.PILL_W, self.PILL_H, self.PILL_R, fill=CTRL, outline="")
-        self.c.create_text(16, self.PILL_H//2, text=self._values[self._idx],
-                           fill=FG, font=(FONT, 12), anchor="w")
-        # Arrow
-        ax = self.PILL_W - 20
-        ay = self.PILL_H // 2
-        self.c.create_text(ax, ay, text="\\u25BE", fill=FG2, font=(FONT, 11))
+        rr(self.c, 0, 0, self.PW, self.PH, self.PH//2, fill=CTRL, outline="")
+        self.c.create_text(16, self.PH//2, text=self._values[self._idx],
+                           fill=FG, font=(FONT, 11), anchor="w")
+        self.c.create_text(self.PW-18, self.PH//2, text="\\u25BE", fill=FG2, font=(FONT, 10))
 
-    def _cycle(self, _e=None):
-        self._idx = (self._idx + 1) % len(self._values)
+    def _open_menu(self, event):
+        menu = tk.Menu(self.c, tearoff=0, bg=CTRL, fg=FG, font=(FONT, 11),
+                       activebackground=CTRL_HL, activeforeground=FG,
+                       borderwidth=0, relief="flat")
+        for i, val in enumerate(self._values):
+            menu.add_command(label=val, command=lambda idx=i: self._select(idx))
+        menu.tk_popup(self.c.winfo_rootx(), self.c.winfo_rooty() + self.PH)
+
+    def _select(self, idx):
+        self._idx = idx
         self._draw()
         if self._on_change:
             self._on_change()
@@ -286,8 +292,8 @@ class PillSelect:
         self.c.pack(**kw)
 
 class Toggle:
-    \"\"\"Canvas-based toggle switch.\"\"\"
-    W, H = 36, 20
+    \"\"\"Canvas-based oval toggle switch.\"\"\"
+    W, H = 42, 24
 
     def __init__(self, parent, label, current, on_change=None):
         self._on = current
@@ -296,16 +302,16 @@ class Toggle:
         self.c = tk.Canvas(self.frame, width=self.W, height=self.H,
                            bg=BG, highlightthickness=0, bd=0, cursor="hand2")
         self.c.pack(side="left")
-        tk.Label(self.frame, text=label, font=(FONT, 12), bg=BG, fg=FG).pack(side="left", padx=(8, 0))
+        tk.Label(self.frame, text=label, font=(FONT, 11), bg=BG, fg=FG).pack(side="left", padx=(10, 0))
         self._draw()
         self.c.bind("<Button-1>", self._toggle)
 
     def _draw(self):
         self.c.delete("all")
-        bg = ACCENT if self._on else FG3
+        bg = ACCENT if self._on else SEP
         rr(self.c, 0, 0, self.W, self.H, self.H//2, fill=bg, outline="")
-        cx = self.W - 10 if self._on else 10
-        self.c.create_oval(cx-7, 3, cx+7, self.H-3, fill="white", outline="")
+        cx = self.W - 12 if self._on else 12
+        self.c.create_oval(cx-9, 3, cx+9, self.H-3, fill="white", outline="")
 
     def _toggle(self, _e=None):
         self._on = not self._on
@@ -502,7 +508,7 @@ def build_history():
                                  bg=BG, highlightthickness=0, bd=0)
         card_canvas.pack(anchor="w", padx=16, pady=(6, 0))
 
-        rr(card_canvas, 0, 0, card_w, card_h, 10, fill=CARD, outline="")
+        rr(card_canvas, 0, 0, card_w, card_h, 16, fill=CARD, outline="")
 
         time_s = stamp.split(" ")[-1] if " " in stamp else stamp
         date_s = stamp.split(" ")[0] if " " in stamp else ""

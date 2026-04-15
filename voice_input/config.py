@@ -18,9 +18,9 @@ DEFAULT_CONFIG = {
 MODEL_INFO = {
     "tiny":            {"size": "75 MB",  "speed": 5, "quality": 2},
     "base":            {"size": "142 MB", "speed": 4, "quality": 3},
-    "small":           {"size": "466 MB", "speed": 3, "quality": 4},
+    "small":           {"size": "466 MB", "speed": 3, "quality": 4, "recommended": True},
     "medium":          {"size": "1.5 GB", "speed": 2, "quality": 4},
-    "large-v3-turbo":  {"size": "1.5 GB", "speed": 4, "quality": 5, "recommended": True},
+    "large-v3-turbo":  {"size": "1.5 GB", "speed": 4, "quality": 5},
     "large-v3":        {"size": "3 GB",   "speed": 1, "quality": 5},
 }
 

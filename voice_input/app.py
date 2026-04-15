@@ -47,6 +47,12 @@ class VoiceInputApp:
         log.info("%s starting...", config.APP_NAME)
         self._write_status(HudState.HIDDEN, "Starting")
 
+        # Clear transcript history for fresh session
+        try:
+            config.TRANSCRIPT_HISTORY_PATH.write_text("[]", encoding="utf-8")
+        except OSError:
+            pass
+
         # Start HUD overlay thread
         self._hud.start()
 
