@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 
 class HotkeyListener:
-    """Cross-platform hotkey listener. On Mac uses Fn via Quartz, on Windows uses pynput."""
+    """Cross-platform hotkey listener."""
 
     def __init__(
         self,
@@ -48,12 +48,17 @@ class HotkeyListener:
         log.info("Hotkey listener stopped")
 
     def update_hotkey(self, hotkey_str: str) -> None:
+        if hotkey_str == self._hotkey_str:
+            return
+        log.info("Updating hotkey from %s to %s", self._hotkey_str, hotkey_str)
         self._hotkey_str = hotkey_str
         if self._running and self._impl:
             if sys.platform == "darwin":
+                # Must fully stop + restart on macOS (CGEventTap captures keycode at creation)
                 self._impl.stop()
                 self._impl = _MacHotkeyListener(self._hotkey_str, self._on_press, self._on_release)
                 self._impl.start()
+                log.info("Hotkey listener restarted for %s", hotkey_str)
             elif hasattr(self._impl, "update_hotkey"):
                 self._impl.update_hotkey(hotkey_str)
 
@@ -61,7 +66,7 @@ class HotkeyListener:
 class _MacHotkeyListener:
     """Listen for configurable modifier key on macOS using Quartz CGEventTap."""
 
-    # keycode, modifier flag mask (from NSEvent modifier flags)
+    # keycode → modifier flag mask (NSEvent modifier flags)
     _KEY_MAP = {
         "fn":          (63, 0x800000),   # NSEventModifierFlagSecondaryFn
         "Key.alt_r":   (61, 0x80000),    # NSEventModifierFlagOption
@@ -77,7 +82,10 @@ class _MacHotkeyListener:
         self._thread = None
         self._tap = None
         self._loop_ref = None
+        self._source = None
         self._keycode, self._flag = self._KEY_MAP.get(hotkey_str, (63, 0x800000))
+        log.info("MacHotkeyListener init: key=%s keycode=%d flag=0x%x",
+                 hotkey_str, self._keycode, self._flag)
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -85,12 +93,17 @@ class _MacHotkeyListener:
 
     def _run(self) -> None:
         import Quartz
-        from Foundation import NSRunLoop, NSDate
 
         keycode = self._keycode
         flag = self._flag
 
         def callback(proxy, event_type, event, refcon):
+            # Re-enable tap if macOS disabled it due to timeout
+            if event_type == Quartz.kCGEventTapDisabledByTimeout:
+                if self._tap:
+                    Quartz.CGEventTapEnable(self._tap, True)
+                return event
+
             ev_keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
             flags = Quartz.CGEventGetFlags(event)
 
@@ -111,7 +124,8 @@ class _MacHotkeyListener:
 
             return event
 
-        event_mask = Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+        event_mask = (Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+                      | Quartz.CGEventMaskBit(Quartz.kCGEventTapDisabledByTimeout))
         self._tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
             Quartz.kCGHeadInsertEventTap,
@@ -122,21 +136,61 @@ class _MacHotkeyListener:
         )
 
         if self._tap is None:
-            log.error("Failed to create event tap. Grant Accessibility permissions in System Settings.")
+            log.error("Failed to create event tap for %s. "
+                      "Grant Accessibility permissions in System Settings.", self._hotkey_str)
             return
 
-        source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+        self._source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
         self._loop_ref = Quartz.CFRunLoopGetCurrent()
-        Quartz.CFRunLoopAddSource(self._loop_ref, source, Quartz.kCFRunLoopDefaultMode)
+        Quartz.CFRunLoopAddSource(self._loop_ref, self._source, Quartz.kCFRunLoopDefaultMode)
         Quartz.CGEventTapEnable(self._tap, True)
+        log.info("Event tap active for %s (keycode=%d, flag=0x%x)", self._hotkey_str, keycode, flag)
         Quartz.CFRunLoopRun()
+        log.info("Event tap run loop exited for %s", self._hotkey_str)
 
     def stop(self) -> None:
+        import Quartz
+
         self._key_down = False
+
+        # Disable the event tap first
+        if self._tap:
+            try:
+                Quartz.CGEventTapEnable(self._tap, False)
+            except Exception:
+                pass
+
+        # Remove source from run loop
+        if self._source and self._loop_ref:
+            try:
+                Quartz.CFRunLoopRemoveSource(self._loop_ref, self._source, Quartz.kCFRunLoopDefaultMode)
+            except Exception:
+                pass
+
+        # Stop the run loop (causes CFRunLoopRun to return in the thread)
         if self._loop_ref:
-            import Quartz
-            Quartz.CFRunLoopStop(self._loop_ref)
-            self._loop_ref = None
+            try:
+                Quartz.CFRunLoopStop(self._loop_ref)
+            except Exception:
+                pass
+
+        # Wait for thread to actually finish
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+        # Invalidate the mach port
+        if self._tap:
+            try:
+                import CoreFoundation
+                CoreFoundation.CFMachPortInvalidate(self._tap)
+            except Exception:
+                pass
+
+        self._tap = None
+        self._source = None
+        self._loop_ref = None
+        self._thread = None
+        log.info("Event tap stopped and cleaned up for %s", self._hotkey_str)
 
 
 class _PynputListener:
