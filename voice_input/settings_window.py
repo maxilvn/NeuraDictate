@@ -123,7 +123,7 @@ class RBtn:
     def __init__(self, parent, text, cmd, bg_color=CTRL, fg_color=FG,
                  hover=CTRL_HL, w=90, h=30, r=RAD, font_t=(FONT, 11), parent_bg=BG):
         self.c = tk.Canvas(parent, width=w, height=h, bg=parent_bg,
-                           highlightthickness=0, bd=0, cursor="hand2")
+                           highlightthickness=0, bd=0, cursor="")
         self._bg = bg_color
         self._fg = fg_color
         self._hover = hover
@@ -205,7 +205,7 @@ def switch_tab(name):
         refresh_model_dropdown()
 
 for tname in ["settings", "models", "history"]:
-    c = tk.Canvas(tab_bar, width=TAB_W, height=TAB_H, bg=BG, highlightthickness=0, bd=0, cursor="hand2")
+    c = tk.Canvas(tab_bar, width=TAB_W, height=TAB_H, bg=BG, highlightthickness=0, bd=0, cursor="")
     c.pack(side="left", padx=(0, 4))
     c.bind("<Button-1>", lambda e, n=tname: switch_tab(n))
     tab_canvases[tname] = c
@@ -254,7 +254,7 @@ class PillSelect:
         self._on_change = on_change
         self._parent = parent
         self.c = tk.Canvas(parent, width=self.PW, height=self.PH,
-                           bg=BG, highlightthickness=0, bd=0, cursor="hand2")
+                           bg=BG, highlightthickness=0, bd=0, cursor="")
         self._draw()
         self.c.bind("<Button-1>", self._open_menu)
 
@@ -300,7 +300,7 @@ class Toggle:
         self._on_change = on_change
         self.frame = tk.Frame(parent, bg=BG)
         self.c = tk.Canvas(self.frame, width=self.W, height=self.H,
-                           bg=BG, highlightthickness=0, bd=0, cursor="hand2")
+                           bg=BG, highlightthickness=0, bd=0, cursor="")
         self.c.pack(side="left")
         tk.Label(self.frame, text=label, font=(FONT, 11), bg=BG, fg=FG).pack(side="left", padx=(8, 0))
         self._draw()

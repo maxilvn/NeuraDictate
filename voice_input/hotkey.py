@@ -61,11 +61,12 @@ class HotkeyListener:
 class _MacHotkeyListener:
     """Listen for configurable modifier key on macOS using Quartz CGEventTap."""
 
+    # keycode, modifier flag mask (from NSEvent modifier flags)
     _KEY_MAP = {
-        "fn":          (63, 0x800000),
-        "Key.alt_r":   (61, 0x40),
-        "Key.cmd_r":   (54, 0x10),
-        "Key.ctrl_l":  (59, 0x1),
+        "fn":          (63, 0x800000),   # NSEventModifierFlagSecondaryFn
+        "Key.alt_r":   (61, 0x80000),    # NSEventModifierFlagOption
+        "Key.cmd_r":   (54, 0x100000),   # NSEventModifierFlagCommand
+        "Key.ctrl_l":  (59, 0x40000),    # NSEventModifierFlagControl
     }
 
     def __init__(self, hotkey_str, on_press, on_release):
