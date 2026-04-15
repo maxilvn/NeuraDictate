@@ -68,10 +68,16 @@ class _MacHotkeyListener:
 
     # keycode → modifier flag mask (NSEvent modifier flags)
     _KEY_MAP = {
-        "fn":          (63, 0x800000),   # NSEventModifierFlagSecondaryFn
-        "Key.alt_r":   (61, 0x80000),    # NSEventModifierFlagOption
-        "Key.cmd_r":   (54, 0x100000),   # NSEventModifierFlagCommand
-        "Key.ctrl_l":  (59, 0x40000),    # NSEventModifierFlagControl
+        "fn":            (63, 0x800000),   # NSEventModifierFlagSecondaryFn
+        "Key.alt_r":     (61, 0x80000),    # NSEventModifierFlagOption
+        "Key.alt_l":     (58, 0x80000),    # NSEventModifierFlagOption
+        "Key.cmd_r":     (54, 0x100000),   # NSEventModifierFlagCommand
+        "Key.cmd_l":     (55, 0x100000),   # NSEventModifierFlagCommand
+        "Key.ctrl_l":    (59, 0x40000),    # NSEventModifierFlagControl
+        "Key.ctrl_r":    (62, 0x40000),    # NSEventModifierFlagControl
+        "Key.shift_l":   (56, 0x20000),    # NSEventModifierFlagShift
+        "Key.shift_r":   (60, 0x20000),    # NSEventModifierFlagShift
+        "Key.caps_lock": (57, 0x10000),    # NSEventModifierFlagCapsLock
     }
 
     def __init__(self, hotkey_str, on_press, on_release):

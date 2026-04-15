@@ -249,10 +249,9 @@ content_area.pack(fill="both", expand=True, padx=0, pady=(6, 16))
 _init = [False]
 
 def build_cfg():
-    rev_hk = {{v: k for k, v in hotkeys.items()}}
     rev_lg = dict(zip(lg_display, lg_keys))
     return {{
-        "hotkey": rev_hk.get(hk_pill.get(), hk_pill.get()),
+        "hotkey": _hk_value[0],
         "model": md_pill.get(),
         "language": rev_lg.get(lg_pill.get(), "auto"),
         "auto_paste": paste_toggle.get(),
@@ -371,10 +370,69 @@ class Toggle:
 
 # Hotkey
 field_label(sf, "Hotkey")
-hk_display = [hotkeys.get(v, v) for v in hotkeys]
-hk_cur = hotkeys.get(cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"), "Fn")
-hk_pill = PillSelect(sf, hk_display, hk_cur, on_change=schedule_save)
-hk_pill.pack(anchor="w", padx=20, pady=(0, 4))
+_hk_value = [cfg.get("hotkey", "fn" if is_mac else "Key.alt_r")]
+_hk_name = [hotkeys.get(_hk_value[0], _hk_value[0])]
+
+hk_row = tk.Frame(sf, bg=BG)
+hk_row.pack(anchor="w", padx=20, pady=(0, 4))
+
+# Current hotkey display pill
+HK_W, HK_H = 120, 26
+hk_canvas = tk.Canvas(hk_row, width=HK_W, height=HK_H, bg=BG, highlightthickness=0, bd=0)
+hk_canvas.pack(side="left")
+
+def _draw_hk():
+    hk_canvas.delete("all")
+    rr(hk_canvas, 0, 0, HK_W, HK_H, HK_H//2, fill=CTRL, outline="")
+    hk_canvas.create_text(HK_W//2, HK_H//2, text=_hk_name[0], fill=FG, font=(FONT, 10))
+_draw_hk()
+
+# "Record" button
+_recording_hk = [False]
+
+def _start_record():
+    _recording_hk[0] = True
+    hk_canvas.delete("all")
+    rr(hk_canvas, 0, 0, HK_W, HK_H, HK_H//2, fill=ACCENT, outline="")
+    hk_canvas.create_text(HK_W//2, HK_H//2, text="Press a key...", fill="white", font=(FONT, 10))
+    root.focus_set()
+    root.bind("<Key>", _on_key_record)
+
+def _on_key_record(event):
+    if not _recording_hk[0]:
+        return
+    _recording_hk[0] = False
+    root.unbind("<Key>")
+
+    key_name = event.keysym
+    # Map to pynput-style key string
+    key_map = {{
+        "Fn": "fn", "fn": "fn",
+        "Alt_R": "Key.alt_r", "Alt_L": "Key.alt_l",
+        "Control_L": "Key.ctrl_l", "Control_R": "Key.ctrl_r",
+        "Super_R": "Key.cmd_r", "Super_L": "Key.cmd_l",
+        "Caps_Lock": "Key.caps_lock",
+        "Shift_L": "Key.shift_l", "Shift_R": "Key.shift_r",
+        "Escape": "Key.esc",
+        "F1": "Key.f1", "F2": "Key.f2", "F3": "Key.f3", "F4": "Key.f4",
+        "F5": "Key.f5", "F6": "Key.f6", "F7": "Key.f7", "F8": "Key.f8",
+        "F9": "Key.f9", "F10": "Key.f10", "F11": "Key.f11", "F12": "Key.f12",
+    }}
+    key_id = key_map.get(key_name, key_name)
+    display = key_name.replace("_", " ")
+
+    # Add to hotkeys dict if new
+    if key_id not in hotkeys:
+        hotkeys[key_id] = display
+
+    _hk_value[0] = key_id
+    _hk_name[0] = hotkeys.get(key_id, display)
+    _draw_hk()
+    schedule_save()
+
+rec_btn = RBtn(hk_row, "Set new", _start_record, bg_color=CTRL, fg_color=FG2,
+               hover=CTRL_HL, w=75, h=26, font_t=(FONT, 10))
+rec_btn.pack(side="left", padx=(8, 0))
 sep(sf)
 
 # Model (only downloaded)
