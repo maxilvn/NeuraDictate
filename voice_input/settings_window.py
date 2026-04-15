@@ -196,16 +196,7 @@ def _build_settings_script(cfg: dict) -> str:
             return var
 
         row = 1
-        if is_mac:
-            tk.Label(settings_card, text="Hotkey", font=("Helvetica", 10), bg=PANEL, fg=MUTED).grid(
-                row=row, column=0, sticky="w", padx=16, pady=(8, 2), columnspan=2
-            )
-            tk.Label(settings_card, text="Fn (macOS fixed for now)", font=("Helvetica", 10), bg=PANEL_ALT, fg=FG).grid(
-                row=row + 1, column=0, sticky="ew", padx=16, pady=(0, 4), columnspan=2
-            )
-            hotkey_var = None
-        else:
-            hotkey_var = add_dropdown(settings_card, "Hotkey", list(hotkeys.keys()), hotkeys, cfg.get("hotkey", "Key.alt_r"), row)
+        hotkey_var = add_dropdown(settings_card, "Hotkey", list(hotkeys.keys()), hotkeys, cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"), row)
         row += 2
 
         model_var = add_dropdown(settings_card, "Model", models, {{}}, cfg.get("model", "large-v3-turbo"), row)

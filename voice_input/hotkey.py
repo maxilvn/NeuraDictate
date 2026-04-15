@@ -1,4 +1,4 @@
-"""Global hotkey listener - Mac: Quartz CGEventTap (Fn key), Windows: pynput."""
+"""Global hotkey listener - Mac: Quartz CGEventTap (configurable modifier), Windows: pynput."""
 
 import logging
 import sys
@@ -33,12 +33,12 @@ class HotkeyListener:
         self._running = True
 
         if sys.platform == "darwin":
-            self._impl = _MacFnListener(self._on_press, self._on_release)
+            self._impl = _MacHotkeyListener(self._hotkey_str, self._on_press, self._on_release)
         else:
             self._impl = _PynputListener(self._hotkey_str, self._on_press, self._on_release)
 
         self._impl.start()
-        log.info("Hotkey listener started (%s)", "Fn" if sys.platform == "darwin" else self._hotkey_str)
+        log.info("Hotkey listener started (%s)", self._hotkey_str)
 
     def stop(self) -> None:
         self._running = False
@@ -49,23 +49,34 @@ class HotkeyListener:
 
     def update_hotkey(self, hotkey_str: str) -> None:
         self._hotkey_str = hotkey_str
-        if self._impl and hasattr(self._impl, "update_hotkey"):
-            self._impl.update_hotkey(hotkey_str)
+        if self._running and self._impl:
+            if sys.platform == "darwin":
+                self._impl.stop()
+                self._impl = _MacHotkeyListener(self._hotkey_str, self._on_press, self._on_release)
+                self._impl.start()
+            elif hasattr(self._impl, "update_hotkey"):
+                self._impl.update_hotkey(hotkey_str)
 
 
-class _MacFnListener:
-    """Listen for Fn key on macOS using Quartz CGEventTap."""
+class _MacHotkeyListener:
+    """Listen for configurable modifier key on macOS using Quartz CGEventTap."""
 
-    FN_KEYCODE = 63
-    FN_FLAG = 0x800000  # NSEventModifierFlagSecondaryFn
+    _KEY_MAP = {
+        "fn":          (63, 0x800000),
+        "Key.alt_r":   (61, 0x40),
+        "Key.cmd_r":   (54, 0x10),
+        "Key.ctrl_l":  (59, 0x1),
+    }
 
-    def __init__(self, on_press, on_release):
+    def __init__(self, hotkey_str, on_press, on_release):
+        self._hotkey_str = hotkey_str
         self._on_press = on_press
         self._on_release = on_release
-        self._fn_down = False
+        self._key_down = False
         self._thread = None
         self._tap = None
         self._loop_ref = None
+        self._keycode, self._flag = self._KEY_MAP.get(hotkey_str, (63, 0x800000))
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -75,20 +86,23 @@ class _MacFnListener:
         import Quartz
         from Foundation import NSRunLoop, NSDate
 
+        keycode = self._keycode
+        flag = self._flag
+
         def callback(proxy, event_type, event, refcon):
-            keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
+            ev_keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
             flags = Quartz.CGEventGetFlags(event)
 
-            if keycode == self.FN_KEYCODE:
-                fn_pressed = bool(flags & self.FN_FLAG)
-                if fn_pressed and not self._fn_down:
-                    self._fn_down = True
+            if ev_keycode == keycode:
+                key_pressed = bool(flags & flag)
+                if key_pressed and not self._key_down:
+                    self._key_down = True
                     try:
                         self._on_press()
                     except Exception:
                         log.exception("Error in on_press")
-                elif not fn_pressed and self._fn_down:
-                    self._fn_down = False
+                elif not key_pressed and self._key_down:
+                    self._key_down = False
                     try:
                         self._on_release()
                     except Exception:
@@ -117,10 +131,14 @@ class _MacFnListener:
         Quartz.CFRunLoopRun()
 
     def stop(self) -> None:
-        self._fn_down = False
+        self._key_down = False
         if self._loop_ref:
             Quartz.CFRunLoopStop(self._loop_ref)
             self._loop_ref = None
+
+    def update_hotkey(self, hotkey_str):
+        self._hotkey_str = hotkey_str
+        self._keycode, self._flag = self._KEY_MAP.get(hotkey_str, (63, 0x800000))
 
 
 class _PynputListener:

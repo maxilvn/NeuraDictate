@@ -39,12 +39,21 @@ AVAILABLE_LANGUAGES = {
     "ko": "한국어",
 }
 
-HOTKEY_OPTIONS = {
+MAC_HOTKEY_OPTIONS = {
+    "fn": "Fn",
+    "Key.alt_r": "Right Option",
+    "Key.cmd_r": "Right Command",
+    "Key.ctrl_l": "Left Control",
+}
+
+WIN_HOTKEY_OPTIONS = {
     "Key.alt_r": "Right Alt",
     "Key.caps_lock": "Caps Lock",
     "Key.scroll_lock": "Scroll Lock",
     "Key.pause": "Pause",
 }
+
+HOTKEY_OPTIONS = MAC_HOTKEY_OPTIONS if sys.platform == "darwin" else WIN_HOTKEY_OPTIONS
 
 
 def _config_dir() -> Path:
