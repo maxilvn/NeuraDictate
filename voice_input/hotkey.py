@@ -133,12 +133,9 @@ class _MacHotkeyListener:
     def stop(self) -> None:
         self._key_down = False
         if self._loop_ref:
+            import Quartz
             Quartz.CFRunLoopStop(self._loop_ref)
             self._loop_ref = None
-
-    def update_hotkey(self, hotkey_str):
-        self._hotkey_str = hotkey_str
-        self._keycode, self._flag = self._KEY_MAP.get(hotkey_str, (63, 0x800000))
 
 
 class _PynputListener:

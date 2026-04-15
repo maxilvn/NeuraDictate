@@ -77,7 +77,7 @@ class VoiceInputApp:
     def _on_key_press(self) -> None:
         if not self._active or self._transcribing:
             return
-        log.info("Key pressed - start recording")
+        log.info("Key pressed (%s) - start recording", config.HOTKEY_OPTIONS.get(self._cfg.get("hotkey"), "?"))
         self._hud.show(HudState.LISTENING)
         self._write_status(HudState.LISTENING, "Recording")
         self._recorder.start()
@@ -225,7 +225,7 @@ class VoiceInputApp:
             "transcribing": self._transcribing,
             "state": state,
             "detail": detail,
-            "hotkey": self._cfg.get("hotkey", "Fn" if sys.platform == "darwin" else "Key.alt_r"),
+            "hotkey": config.HOTKEY_OPTIONS.get(self._cfg.get("hotkey", "fn"), self._cfg.get("hotkey", "fn")),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
         try:
