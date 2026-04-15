@@ -22,8 +22,11 @@ class _MacTray:
         self._on_settings = on_settings
         self._on_quit = on_quit
         self._is_active = is_active
-        icon_path = str(config.MODULE_DIR.parent / "iconTemplate.png")
-        self._app = rumps.App(config.APP_NAME, title=None, icon=icon_path, template=True)
+        icon_path = str(config.MODULE_DIR.parent / "icon.png")
+        try:
+            self._app = rumps.App(config.APP_NAME, title="", icon=icon_path, template=True)
+        except Exception:
+            self._app = rumps.App(config.APP_NAME, title="N")
 
     def run(self) -> None:
         import rumps
