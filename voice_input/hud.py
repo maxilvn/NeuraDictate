@@ -244,28 +244,19 @@ class _MacHud:
                     0.05, True, _breathe)
 
             elif state == HudState.TRANSCRIBING and self._icon_view:
-                # Fast size pulse
-                self._pulse_growing = True
-                self._pulse_size = 14
-                iy = (PILL_HEIGHT - self._pulse_size) / 2
-                self._icon_view.setFrame_(((content_x, iy), (self._pulse_size, self._pulse_size)))
-                def _pulse(_):
+                # Smooth bounce: icon moves up and down like a heartbeat
+                import math
+                self._bounce_t = 0.0
+                base_y = (PILL_HEIGHT - icon_s) / 2
+                def _bounce(_):
                     if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
-                    if self._pulse_growing:
-                        self._pulse_size += 1
-                        if self._pulse_size >= 20:
-                            self._pulse_growing = False
-                    else:
-                        self._pulse_size -= 1
-                        if self._pulse_size <= 10:
-                            self._pulse_growing = True
-                    s = self._pulse_size
-                    iy = (PILL_HEIGHT - s) / 2
-                    self._icon_view.setFrame_(((content_x, iy), (s, s)))
+                    self._bounce_t += 0.15
+                    offset = math.sin(self._bounce_t) * 3
+                    self._icon_view.setFrame_(((content_x, base_y + offset), (icon_s, icon_s)))
                     self._icon_view.setNeedsDisplay_(True)
                 self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
-                    0.04, True, _pulse)
+                    0.03, True, _bounce)
 
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
