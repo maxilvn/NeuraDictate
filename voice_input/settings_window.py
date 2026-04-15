@@ -76,18 +76,18 @@ project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 config_path = pathlib.Path(json.loads({config_path_json!r}))
 logo_path = pathlib.Path(json.loads({logo_path_json!r}))
 
-# ── Dark palette ──
-BG      = "#1C1C1E"
-FG      = "#E5E5EA"
-FG2     = "#8E8E93"
-FG3     = "#48484A"
-ACCENT  = "#0A84FF"
-GREEN   = "#32D74B"
-RED     = "#FF453A"
-ORANGE  = "#FF9F0A"
-CTRL    = "#2C2C2E"
-CTRL_HL = "#3A3A3C"
-SEP     = "#38383A"
+# ── Light palette ──
+BG      = "#FFFFFF"
+FG      = "#1C1C1E"
+FG2     = "#6E6E73"
+FG3     = "#AEAEB2"
+ACCENT  = "#007AFF"
+GREEN   = "#34C759"
+RED     = "#FF3B30"
+ORANGE  = "#FF9500"
+CTRL    = "#F2F2F7"
+CTRL_HL = "#E5E5EA"
+SEP     = "#D1D1D6"
 
 FONT = "SF Pro Text" if is_mac else "Segoe UI"
 MONO = "SF Mono" if is_mac else "Consolas"
@@ -113,7 +113,7 @@ sty.configure(".", background=BG, foreground=FG, font=(FONT, 12), borderwidth=0,
 sty.configure("TFrame", background=BG)
 sty.configure("TLabel", background=BG, foreground=FG, font=(FONT, 12))
 sty.configure("Dim.TLabel", background=BG, foreground=FG2, font=(FONT, 10))
-CARD    = "#2C2C2E"
+CARD    = "#F2F2F7"
 
 # ── Rounded rect drawing ──
 def rr(canvas, x1, y1, x2, y2, r, **kw):
@@ -180,21 +180,20 @@ def sep(parent):
     f.pack(fill="x", padx=20, pady=8)
 
 # ── Logo header ──
-header = tk.Frame(root, bg="white")
+header = tk.Frame(root, bg=BG)
 header.pack(fill="x")
 try:
     _logo_img = tk.PhotoImage(file=str(logo_path))
-    # Scale to ~120px wide
     sw = max(1, _logo_img.width() // 120)
     if sw > 1:
         _logo_img = _logo_img.subsample(sw, sw)
-    logo_label = tk.Label(header, image=_logo_img, bg="white")
+    logo_label = tk.Label(header, image=_logo_img, bg=BG)
     logo_label.image = _logo_img
-    logo_label.pack(side="left", padx=(20, 2), pady=10)
+    logo_label.pack(side="left", padx=(20, 2), pady=12)
 except Exception:
     pass
-tk.Label(header, text="Dictate", font=(FONT, 14), bg="white", fg="#333333").pack(
-    side="left", pady=10)
+tk.Label(header, text="Dictate", font=(FONT, 14), bg=BG, fg=FG).pack(
+    side="left", pady=12)
 
 # ── Tab bar (rounded pill buttons) ──
 tab_bar = tk.Frame(root, bg=BG)
