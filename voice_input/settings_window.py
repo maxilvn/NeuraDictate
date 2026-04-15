@@ -53,6 +53,7 @@ def _build_settings_script(cfg: dict) -> str:
     model_dir_json = json.dumps(str(config.MODEL_DIR))
     project_dir_json = json.dumps(str(config.MODULE_DIR))
     config_path_json = json.dumps(str(config.CONFIG_PATH))
+    logo_path_json = json.dumps(str(config.MODULE_DIR.parent / "logo.png"))
 
     return textwrap.dedent(
         f"""\
@@ -73,6 +74,7 @@ model_info = json.loads({model_info_json!r})
 model_dir = pathlib.Path(json.loads({model_dir_json!r}))
 project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 config_path = pathlib.Path(json.loads({config_path_json!r}))
+logo_path = pathlib.Path(json.loads({logo_path_json!r}))
 
 # ── Dark palette ──
 BG      = "#1C1C1E"
@@ -177,9 +179,27 @@ def sep(parent):
     f = tk.Frame(parent, bg=SEP, height=1)
     f.pack(fill="x", padx=20, pady=8)
 
+# ── Logo header ──
+header = tk.Frame(root, bg="white")
+header.pack(fill="x")
+try:
+    _logo_img = tk.PhotoImage(file=str(logo_path))
+    # Scale down to ~140px wide
+    sw = max(1, _logo_img.width() // 140)
+    sh = max(1, _logo_img.height() // 140 * (140 // max(1, _logo_img.width() // 140)))
+    if sw > 1:
+        _logo_img = _logo_img.subsample(sw, sw)
+    logo_label = tk.Label(header, image=_logo_img, bg="white")
+    logo_label.image = _logo_img
+    logo_label.pack(side="left", padx=20, pady=10)
+except Exception:
+    pass
+tk.Label(header, text="NeuraDictate", font=(FONT, 11), bg="white", fg="#333333").pack(
+    side="left", padx=(4, 0), pady=10)
+
 # ── Tab bar (rounded pill buttons) ──
 tab_bar = tk.Frame(root, bg=BG)
-tab_bar.pack(fill="x", padx=20, pady=(16, 0))
+tab_bar.pack(fill="x", padx=20, pady=(12, 0))
 
 current_tab = tk.StringVar(value="settings")
 tab_frames = {{}}
