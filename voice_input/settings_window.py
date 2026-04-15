@@ -90,7 +90,7 @@ def _build_settings_script(cfg: dict) -> str:
         root.resizable(True, True)
         root.minsize(560, 620)
         root.attributes("-topmost", True)
-        root.geometry("680x760")
+        root.geometry("680x820")
 
         root.update_idletasks()
         w = root.winfo_width()
@@ -304,41 +304,86 @@ def _build_settings_script(cfg: dict) -> str:
         ).grid(row=row, column=0, sticky="w", padx=16, pady=(8, 14), columnspan=2)
 
         transcripts_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
-        transcripts_card.pack(fill="both", expand=False, padx=20, pady=(14, 0))
+        transcripts_card.pack(fill="both", expand=True, padx=20, pady=(14, 0))
 
-        tk.Label(transcripts_card, text="Last Transcript", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).pack(
+        tk.Label(transcripts_card, text="Transcripts", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).pack(
             anchor="w", padx=16, pady=(14, 6)
         )
-        last_box = scrolledtext.ScrolledText(
-            transcripts_card,
-            width=68,
-            height=4,
-            wrap="word",
-            bg=FIELD_BG,
-            fg=FG,
-            insertbackground=FG,
-            relief="flat",
-            font=("Helvetica", 10),
-        )
-        last_box.pack(fill="x", padx=16)
-        last_box.config(state="disabled")
 
-        tk.Label(transcripts_card, text="Recent History", font=("Helvetica", 11, "bold"), bg=PANEL, fg=FG).pack(
-            anchor="w", padx=16, pady=(12, 6)
-        )
-        history_box = scrolledtext.ScrolledText(
-            transcripts_card,
-            width=68,
-            height=6,
-            wrap="word",
-            bg=FIELD_BG,
-            fg=FG,
-            insertbackground=FG,
-            relief="flat",
-            font=("Helvetica", 10),
-        )
-        history_box.pack(fill="x", padx=16, pady=(0, 14))
-        history_box.config(state="disabled")
+        # Scrollable container using Canvas + Frame
+        canvas = tk.Canvas(transcripts_card, bg=PANEL, highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(transcripts_card, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas, bg=PANEL)
+
+        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Mouse wheel scrolling for all platforms
+        def _on_mousewheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=(0, 14))
+
+        def build_transcript_cards():
+            for widget in scroll_frame.winfo_children():
+                widget.destroy()
+
+            history = read_json(history_path, [])
+            if not history:
+                tk.Label(scroll_frame, text="No transcripts yet.", font=("Helvetica", 10), bg=PANEL, fg=MUTED).pack(
+                    anchor="w", padx=8, pady=8
+                )
+                return
+
+            for entry in history[:20]:
+                stamp = entry.get("timestamp", "")
+                text = entry.get("text", "")
+
+                card = tk.Frame(scroll_frame, bg=FIELD_BG, highlightbackground=BORDER, highlightthickness=1)
+                card.pack(fill="x", padx=4, pady=(0, 6))
+
+                header = tk.Frame(card, bg=FIELD_BG)
+                header.pack(fill="x", padx=10, pady=(8, 2))
+
+                tk.Label(header, text=stamp, font=("Helvetica", 9), bg=FIELD_BG, fg=MUTED).pack(side="left")
+
+                def make_copy_fn(t, btn):
+                    def copy_fn():
+                        import subprocess as sp
+                        if is_mac:
+                            p = sp.Popen(["pbcopy"], stdin=sp.PIPE)
+                            p.communicate(t.encode("utf-8"))
+                        else:
+                            root.clipboard_clear()
+                            root.clipboard_append(t)
+                        btn.config(text="Copied!", fg=ACCENT)
+                        root.after(1200, lambda: btn.config(text="Copy", fg=MUTED))
+                    return copy_fn
+
+                copy_btn = tk.Button(
+                    header,
+                    text="Copy",
+                    font=("Helvetica", 9),
+                    bg=FIELD_BG,
+                    fg=MUTED,
+                    relief="flat",
+                    padx=6,
+                    pady=0,
+                    activebackground="#3D3D3D",
+                    activeforeground=FG,
+                )
+                copy_btn.pack(side="right")
+                copy_btn.config(command=make_copy_fn(text, copy_btn))
+
+                tk.Label(card, text=text, font=("Helvetica", 10), bg=FIELD_BG, fg=FG, anchor="w", justify="left", wraplength=580).pack(
+                    fill="x", padx=10, pady=(0, 8)
+                )
+
+            canvas.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
 
         logs_card = tk.Frame(root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
         logs_card.pack(fill="both", expand=True, padx=20, pady=(14, 20))
@@ -437,16 +482,7 @@ def _build_settings_script(cfg: dict) -> str:
             hotkey = status.get("hotkey", "")
             updated_var.set(f"Updated: {{updated}}    Hotkey: {{hotkey}}")
 
-            last_text = read_text(last_path, "No transcript yet.")
-            set_text(last_box, last_text or "No transcript yet.")
-
-            history = read_json(history_path, [])
-            history_lines = []
-            for entry in history[:8]:
-                stamp = entry.get("timestamp", "")
-                text = entry.get("text", "")
-                history_lines.append(f"[{{stamp}}]\\n{{text}}")
-            set_text(history_box, "\\n\\n".join(history_lines) if history_lines else "No history yet.")
+            build_transcript_cards()
 
             log_text = read_text(log_path, "")
             lines = log_text.splitlines()
