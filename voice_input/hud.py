@@ -230,12 +230,12 @@ class _MacHud:
                     if self._current_state != HudState.LISTENING or not self._icon_view:
                         return
                     if self._pulse_growing:
-                        self._pulse_alpha += 0.04
+                        self._pulse_alpha += 0.06
                         if self._pulse_alpha >= 1.0:
                             self._pulse_alpha = 1.0
                             self._pulse_growing = False
                     else:
-                        self._pulse_alpha -= 0.04
+                        self._pulse_alpha -= 0.06
                         if self._pulse_alpha <= 0.3:
                             self._pulse_alpha = 0.3
                             self._pulse_growing = True
@@ -253,7 +253,7 @@ class _MacHud:
                 def _pulse(_):
                     if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
-                    self._pulse_t += 0.06
+                    self._pulse_t += 0.10
                     s = _base_s + math.sin(self._pulse_t) * 3
                     self._icon_view.setFrame_(((_cx - s/2, _cy - s/2), (s, s)))
                     self._icon_view.setNeedsDisplay_(True)
