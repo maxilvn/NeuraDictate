@@ -116,8 +116,18 @@ class _MacHotkeyListener:
             f_codes = {1:122, 2:120, 3:99, 4:118, 5:96, 6:97,
                        7:98, 8:100, 9:101, 10:109, 11:103, 12:111}
             return f_codes.get(fnum, 122)
+        _SPECIAL = {
+            "Key.esc": 53, "space": 49, "return": 36, "tab": 48,
+            "delete": 51, "forward_delete": 117,
+            "left": 123, "right": 124, "down": 125, "up": 126,
+        }
+        if char in _SPECIAL:
+            return _SPECIAL[char]
         if char.startswith("Key.esc"):
             return 53
+        # Try as raw keycode (e.g. "18" from old config)
+        if char.isdigit() and int(char) > 9:
+            return int(char)
         return _CHAR_MAP.get(char.lower(), 0)
 
     def start(self) -> None:

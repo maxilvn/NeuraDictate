@@ -417,6 +417,15 @@ def _start_record():
                 12: ("q","Q"), 15: ("r","R"), 1: ("s","S"), 17: ("t","T"),
                 32: ("u","U"), 9: ("v","V"), 13: ("w","W"), 7: ("x","X"),
                 16: ("y","Y"), 6: ("z","Z"),
+                # Numbers
+                18: ("1","1"), 19: ("2","2"), 20: ("3","3"), 21: ("4","4"),
+                23: ("5","5"), 22: ("6","6"), 26: ("7","7"), 28: ("8","8"),
+                25: ("9","9"), 29: ("0","0"),
+                # Special
+                49: ("space","Space"), 36: ("return","Return"), 48: ("tab","Tab"),
+                51: ("delete","Delete"), 117: ("forward_delete","Fwd Delete"),
+                123: ("left","Left"), 124: ("right","Right"),
+                125: ("down","Down"), 126: ("up","Up"),
             }}
             detected = [None]
             def tap_callback(proxy, event_type, event, refcon):
