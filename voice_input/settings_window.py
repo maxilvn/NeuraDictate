@@ -233,11 +233,10 @@ _init = [False]
 
 def build_cfg():
     rev_hk = {{v: k for k, v in hotkeys.items()}}
-    rev_lang = {{v: k for k, v in lang_names.items()}}
     return {{
         "hotkey": rev_hk.get(hk_pill.get(), hk_pill.get()),
         "model": md_pill.get(),
-        "language": rev_lang.get(lg_pill.get(), lg_pill.get()),
+        "language": "auto",
         "auto_paste": paste_toggle.get(),
     }}
 
@@ -375,12 +374,6 @@ def refresh_model_dropdown():
         if dl:
             no_models_lbl.pack_forget()
 
-# Language
-field_label(sf, "Language")
-lg_display = [lang_names.get(v, v) for v in langs]
-lg_cur = lang_names.get(cfg.get("language", "auto"), "Auto-Detect")
-lg_pill = PillSelect(sf, lg_display, lg_cur, on_change=schedule_save)
-lg_pill.pack(anchor="w", padx=20, pady=(0, 4))
 sep(sf)
 
 # Toggles
