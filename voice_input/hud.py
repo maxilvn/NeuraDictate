@@ -291,14 +291,19 @@ class _MacHud:
 
 
 class _TkHud:
-    """Windows HUD - minimal dark pill at bottom-center."""
+    """Windows HUD - white pill with Neura icon + animations."""
+
+    ICON_SIZE = 16
 
     def __init__(self):
         self._root = None
         self._canvas = None
         self._text_id = None
-        self._dot_id = None
+        self._icon_id = None
+        self._icon_img = None
         self._hide_timer = None
+        self._anim_timer = None
+        self._current_state = None
         self._ready = threading.Event()
 
     def start(self) -> None:
@@ -308,18 +313,18 @@ class _TkHud:
 
     def _run(self) -> None:
         import tkinter as tk
+        from pathlib import Path
 
         self._root = tk.Tk()
         self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
-        self._root.attributes("-alpha", 0.88)
-        # Transparent background to avoid visible rect edge
+        self._root.attributes("-alpha", 0.95)
         TRANS = "#F0F0F0"
         self._root.config(bg=TRANS)
         try:
             self._root.attributes("-transparentcolor", TRANS)
         except tk.TclError:
-            pass  # not supported on all platforms
+            pass
         self._root.withdraw()
 
         self._canvas = tk.Canvas(
@@ -334,13 +339,31 @@ class _TkHud:
         self._canvas.create_arc(PILL_WIDTH - PILL_HEIGHT, 0, PILL_WIDTH, PILL_HEIGHT, start=-90, extent=180, fill="#FFFFFF", outline="")
         self._canvas.create_rectangle(r, 0, PILL_WIDTH - r, PILL_HEIGHT, fill="#FFFFFF", outline="")
 
-        # Dot - vertically centered
-        dot_y = (PILL_HEIGHT - DOT_SIZE) // 2
-        self._dot_id = self._canvas.create_oval(14, dot_y, 14 + DOT_SIZE, dot_y + DOT_SIZE, fill="#FF4444", outline="")
+        # Load Neura icon
+        icon_path = Path(__file__).resolve().parent.parent / "icon.png"
+        try:
+            self._icon_img = tk.PhotoImage(file=str(icon_path))
+            # Scale to ICON_SIZE
+            sw = max(1, self._icon_img.width() // self.ICON_SIZE)
+            if sw > 1:
+                self._icon_img = self._icon_img.subsample(sw, sw)
+        except Exception:
+            self._icon_img = None
+
+        # Icon
+        icon_x = 18
+        icon_y = PILL_HEIGHT // 2
+        if self._icon_img:
+            self._icon_id = self._canvas.create_image(icon_x, icon_y, image=self._icon_img)
+        else:
+            self._icon_id = self._canvas.create_oval(
+                14, (PILL_HEIGHT - DOT_SIZE) // 2, 14 + DOT_SIZE,
+                (PILL_HEIGHT + DOT_SIZE) // 2, fill="#34C759", outline="")
+
         # Text
         self._text_id = self._canvas.create_text(
-            28, PILL_HEIGHT // 2, anchor="w",
-            text="", fill="#BBBBBB", font=("Segoe UI", 10)
+            32, PILL_HEIGHT // 2, anchor="w",
+            text="", fill="#1C1C1E", font=("Segoe UI", 10)
         )
 
         self._ready.set()
@@ -356,23 +379,24 @@ class _TkHud:
             if self._hide_timer:
                 self._root.after_cancel(self._hide_timer)
                 self._hide_timer = None
+            if self._anim_timer:
+                self._root.after_cancel(self._anim_timer)
+                self._anim_timer = None
 
+            self._current_state = state
             _, fg = _COLORS.get(state, _COLORS[HudState.ERROR])
-            dot = _DOTS.get(state, _DOTS[HudState.ERROR])
             text = message or _LABELS.get(state, state)
 
             self._canvas.itemconfig(self._text_id, text=text, fill=fg)
-            self._canvas.itemconfig(self._dot_id, fill=dot)
             self._canvas.update_idletasks()
 
-            # Center dot + label as one group so left/right padding matches.
+            # Center icon + text
             text_bbox = self._canvas.bbox(self._text_id)
             text_w = (text_bbox[2] - text_bbox[0]) if text_bbox else 0
-            content_w = DOT_SIZE + DOT_GAP + text_w
-            content_x = max(0, (PILL_WIDTH - content_w) / 2)
-            dot_y = (PILL_HEIGHT - DOT_SIZE) / 2
-            self._canvas.coords(self._dot_id, content_x, dot_y, content_x + DOT_SIZE, dot_y + DOT_SIZE)
-            self._canvas.coords(self._text_id, content_x + DOT_SIZE + DOT_GAP, PILL_HEIGHT / 2)
+            ics = self.ICON_SIZE
+            content_w = ics + DOT_GAP + text_w
+            cx = max(0, (PILL_WIDTH - content_w) / 2)
+            self._canvas.coords(self._text_id, cx + ics + DOT_GAP, PILL_HEIGHT / 2)
 
             screen_w = self._root.winfo_screenwidth()
             screen_h = self._root.winfo_screenheight()
@@ -381,21 +405,73 @@ class _TkHud:
             self._root.geometry(f"{PILL_WIDTH}x{PILL_HEIGHT}+{x}+{y}")
             self._root.deiconify()
 
+            # Animations
+            if state == HudState.LISTENING:
+                self._start_breathing()
+            elif state == HudState.TRANSCRIBING:
+                self._start_pulsing()
+
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = self._root.after(1500, self.hide)
 
         self._root.after(0, _update)
 
+    def _start_breathing(self):
+        """Opacity breathing for listening."""
+        self._breath_alpha = 1.0
+        self._breath_dir = -1
+        def _breathe():
+            if self._current_state != HudState.LISTENING or not self._root:
+                return
+            self._breath_alpha += self._breath_dir * 0.06
+            if self._breath_alpha <= 0.3:
+                self._breath_dir = 1
+            elif self._breath_alpha >= 1.0:
+                self._breath_dir = -1
+            try:
+                self._root.attributes("-alpha", self._breath_alpha * 0.95)
+            except Exception:
+                pass
+            self._anim_timer = self._root.after(50, _breathe)
+        _breathe()
+
+    def _start_pulsing(self):
+        """Size pulsing for transcribing via window alpha."""
+        import math
+        self._pulse_t = 0.0
+        def _pulse():
+            if self._current_state != HudState.TRANSCRIBING or not self._root:
+                return
+            self._pulse_t += 0.10
+            alpha = 0.5 + 0.45 * math.sin(self._pulse_t)
+            try:
+                self._root.attributes("-alpha", alpha)
+            except Exception:
+                pass
+            self._anim_timer = self._root.after(30, _pulse)
+        _pulse()
+
     def hide(self) -> None:
         if self._root:
-            self._root.after(0, self._root.withdraw)
+            def _do_hide():
+                if self._anim_timer:
+                    self._root.after_cancel(self._anim_timer)
+                    self._anim_timer = None
+                self._current_state = None
+                try:
+                    self._root.attributes("-alpha", 0.95)
+                except Exception:
+                    pass
+                self._root.withdraw()
+            self._root.after(0, _do_hide)
 
     def stop(self) -> None:
         if self._root:
             def _do_stop():
                 if self._hide_timer:
                     self._root.after_cancel(self._hide_timer)
-                    self._hide_timer = None
+                if self._anim_timer:
+                    self._root.after_cancel(self._anim_timer)
                 self._root.destroy()
             self._root.after(0, _do_stop)
             self._root = None

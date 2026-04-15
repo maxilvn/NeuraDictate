@@ -456,18 +456,36 @@ def _start_record():
         else:
             # Windows: use pynput
             from pynput import keyboard
+            _KEY_NAMES = {{
+                keyboard.Key.alt_l: ("Key.alt_l", "Left Alt"),
+                keyboard.Key.alt_r: ("Key.alt_r", "Right Alt"),
+                keyboard.Key.ctrl_l: ("Key.ctrl_l", "Left Ctrl"),
+                keyboard.Key.ctrl_r: ("Key.ctrl_r", "Right Ctrl"),
+                keyboard.Key.shift_l: ("Key.shift_l", "Left Shift"),
+                keyboard.Key.shift_r: ("Key.shift_r", "Right Shift"),
+                keyboard.Key.caps_lock: ("Key.caps_lock", "Caps Lock"),
+                keyboard.Key.esc: ("Key.esc", "Escape"),
+                keyboard.Key.space: ("space", "Space"),
+                keyboard.Key.enter: ("return", "Return"),
+                keyboard.Key.tab: ("tab", "Tab"),
+                keyboard.Key.backspace: ("delete", "Delete"),
+                keyboard.Key.f1: ("Key.f1","F1"), keyboard.Key.f2: ("Key.f2","F2"),
+                keyboard.Key.f3: ("Key.f3","F3"), keyboard.Key.f4: ("Key.f4","F4"),
+                keyboard.Key.f5: ("Key.f5","F5"), keyboard.Key.f6: ("Key.f6","F6"),
+                keyboard.Key.f7: ("Key.f7","F7"), keyboard.Key.f8: ("Key.f8","F8"),
+                keyboard.Key.f9: ("Key.f9","F9"), keyboard.Key.f10: ("Key.f10","F10"),
+                keyboard.Key.f11: ("Key.f11","F11"), keyboard.Key.f12: ("Key.f12","F12"),
+            }}
             detected = [None]
             def on_press(key):
-                try:
-                    if hasattr(key, 'char') and key.char:
-                        detected[0] = (key.char, key.char.upper())
-                    else:
-                        name = str(key).replace("Key.", "Key.")
-                        display = str(key).replace("Key.", "").replace("_", " ").title()
-                        detected[0] = (name, display)
-                except Exception:
-                    detected[0] = (str(key), str(key))
-                return False
+                if key in _KEY_NAMES:
+                    detected[0] = _KEY_NAMES[key]
+                elif hasattr(key, 'char') and key.char:
+                    detected[0] = (key.char, key.char.upper())
+                else:
+                    s = str(key).replace("Key.", "")
+                    detected[0] = (str(key), s.replace("_", " ").title())
+                return False  # stops listener
             with keyboard.Listener(on_press=on_press) as listener:
                 listener.join()
             if detected[0]:

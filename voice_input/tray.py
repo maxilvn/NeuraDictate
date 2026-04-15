@@ -59,31 +59,25 @@ class _WinTray:
     """Windows tray using pystray."""
 
     def __init__(self, on_toggle, on_settings, on_quit, is_active):
-        from PIL import Image, ImageDraw
+        from PIL import Image
 
         self._on_toggle = on_toggle
         self._on_settings = on_settings
         self._on_quit = on_quit
         self._is_active = is_active
         self._icon = None
-        self._image = self._create_icon()
+        icon_path = config.MODULE_DIR.parent / "icon.png"
+        try:
+            self._image = Image.open(str(icon_path)).resize((64, 64), Image.LANCZOS)
+        except Exception:
+            self._image = self._create_fallback_icon()
 
-    def _create_icon(self, color="#43A047", size=64):
+    @staticmethod
+    def _create_fallback_icon(size=64):
         from PIL import Image, ImageDraw
-
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        draw.ellipse([4, 4, size - 4, size - 4], fill=color)
-        cx, cy = size // 2, size // 2
-        r = size // 6
-        draw.rounded_rectangle(
-            [cx - r, cy - r - 4, cx + r, cy + r + 2], radius=r, fill="white"
-        )
-        draw.rectangle([cx - 1, cy + r + 2, cx + 1, cy + r + 10], fill="white")
-        draw.arc(
-            [cx - r - 4, cy - 2, cx + r + 4, cy + r + 8],
-            start=0, end=180, fill="white", width=2,
-        )
+        draw.ellipse([4, 4, size - 4, size - 4], fill="#43A047")
         return img
 
     def run(self) -> None:

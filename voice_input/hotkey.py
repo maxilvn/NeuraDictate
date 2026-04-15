@@ -253,10 +253,27 @@ class _PynputListener:
         from pynput import keyboard
 
         if key_str.startswith("Key."):
-            return getattr(keyboard.Key, key_str[4:])
+            try:
+                return getattr(keyboard.Key, key_str[4:])
+            except AttributeError:
+                pass
         if len(key_str) == 1:
             return keyboard.KeyCode.from_char(key_str)
-        return getattr(keyboard.Key, key_str)
+        # Try common names
+        _SPECIAL = {
+            "fn": keyboard.Key.fn if hasattr(keyboard.Key, "fn") else None,
+            "space": keyboard.Key.space, "return": keyboard.Key.enter,
+            "tab": keyboard.Key.tab, "escape": keyboard.Key.esc,
+            "delete": keyboard.Key.backspace, "forward_delete": keyboard.Key.delete,
+            "left": keyboard.Key.left, "right": keyboard.Key.right,
+            "up": keyboard.Key.up, "down": keyboard.Key.down,
+        }
+        if key_str in _SPECIAL and _SPECIAL[key_str]:
+            return _SPECIAL[key_str]
+        try:
+            return getattr(keyboard.Key, key_str)
+        except AttributeError:
+            return keyboard.KeyCode.from_char(key_str[0]) if key_str else keyboard.Key.alt_r
 
     def start(self) -> None:
         from pynput import keyboard
