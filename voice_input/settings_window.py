@@ -47,9 +47,7 @@ def _build_settings_script(cfg: dict) -> str:
     hotkeys_json = json.dumps(config.HOTKEY_OPTIONS)
     app_name_json = json.dumps(config.APP_NAME)
     status_path_json = json.dumps(str(config.STATUS_PATH))
-    log_path_json = json.dumps(str(config.LOG_PATH))
     history_path_json = json.dumps(str(config.TRANSCRIPT_HISTORY_PATH))
-    last_path_json = json.dumps(str(config.LAST_TRANSCRIPT_PATH))
     is_mac_json = "True" if sys.platform == "darwin" else "False"
     model_info_json = json.dumps(config.MODEL_INFO)
     model_dir_json = json.dumps(str(config.MODEL_DIR))
@@ -68,29 +66,28 @@ lang_names = json.loads({lang_names_json!r})
 hotkeys = json.loads({hotkeys_json!r})
 app_name = json.loads({app_name_json!r})
 status_path = pathlib.Path(json.loads({status_path_json!r}))
-log_path = pathlib.Path(json.loads({log_path_json!r}))
 history_path = pathlib.Path(json.loads({history_path_json!r}))
-last_path = pathlib.Path(json.loads({last_path_json!r}))
 is_mac = {is_mac_json}
 model_info = json.loads({model_info_json!r})
 model_dir = pathlib.Path(json.loads({model_dir_json!r}))
 project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 
-# ── Palette ──
-BG      = "#2B2B2D"
+# ── Dark palette ──
+BG      = "#1C1C1E"
 FG      = "#E5E5EA"
-FG2     = "#98989D"
-FG3     = "#636366"
+FG2     = "#8E8E93"
+FG3     = "#48484A"
 ACCENT  = "#0A84FF"
 GREEN   = "#32D74B"
 RED     = "#FF453A"
 ORANGE  = "#FF9F0A"
-CTRL    = "#3A3A3C"
-CTRL_HL = "#48484A"
-SEP     = "#3A3A3C"
+CTRL    = "#2C2C2E"
+CTRL_HL = "#3A3A3C"
+SEP     = "#38383A"
 
 FONT = "SF Pro Text" if is_mac else "Segoe UI"
 MONO = "SF Mono" if is_mac else "Consolas"
+RAD  = 10  # corner radius
 
 root = tk.Tk()
 root.title(app_name)
@@ -105,64 +102,70 @@ x = (root.winfo_screenwidth() - w) // 2
 y = (root.winfo_screenheight() - h) // 2
 root.geometry(f"{{w}}x{{h}}+{{x}}+{{y}}")
 
-# ── ttk theme ──
-style = ttk.Style()
-style.theme_use("clam")
-
-style.configure(".", background=BG, foreground=FG, font=(FONT, 12),
-                borderwidth=0, focuscolor=BG)
-style.configure("TFrame", background=BG)
-style.configure("TLabel", background=BG, foreground=FG, font=(FONT, 12))
-style.configure("Dim.TLabel", foreground=FG2, font=(FONT, 10))
-style.configure("Tiny.TLabel", foreground=FG3, font=(FONT, 9))
-
-# Rounded-feel buttons via padding and field background
-style.configure("Accent.TButton", background=ACCENT, foreground="white",
-                font=(FONT, 11, "bold"), padding=(16, 6))
-style.map("Accent.TButton",
-          background=[("active", "#0070E0"), ("pressed", "#005BBB")])
-
-style.configure("Ctrl.TButton", background=CTRL, foreground=FG,
-                font=(FONT, 11), padding=(12, 6))
-style.map("Ctrl.TButton",
-          background=[("active", CTRL_HL), ("pressed", "#555558")])
-
-style.configure("Small.TButton", background=CTRL, foreground=FG2,
-                font=(FONT, 10), padding=(8, 3))
-style.map("Small.TButton",
-          background=[("active", CTRL_HL)])
-
-style.configure("Danger.TButton", background=BG, foreground=RED,
-                font=(FONT, 10), padding=(8, 3))
-style.map("Danger.TButton",
-          background=[("active", CTRL)])
-
-style.configure("Download.TButton", background=ACCENT, foreground="white",
-                font=(FONT, 10, "bold"), padding=(10, 3))
-style.map("Download.TButton",
-          background=[("active", "#0070E0"), ("disabled", FG3)])
-
-# Combobox styling
-style.configure("TCombobox", fieldbackground=CTRL, background=CTRL,
-                foreground=FG, arrowcolor=FG2, padding=(8, 6),
-                selectbackground=CTRL, selectforeground=FG)
-style.map("TCombobox",
-          fieldbackground=[("readonly", CTRL), ("focus", CTRL)],
-          selectbackground=[("readonly", CTRL)],
-          selectforeground=[("readonly", FG)])
+# ── ttk clam theme (allows color control on macOS) ──
+sty = ttk.Style()
+sty.theme_use("clam")
+sty.configure(".", background=BG, foreground=FG, font=(FONT, 12), borderwidth=0, focuscolor=BG)
+sty.configure("TFrame", background=BG)
+sty.configure("TLabel", background=BG, foreground=FG, font=(FONT, 12))
+sty.configure("Dim.TLabel", background=BG, foreground=FG2, font=(FONT, 10))
+sty.configure("TCombobox", fieldbackground=CTRL, background=CTRL, foreground=FG,
+              arrowcolor=FG2, padding=(10, 7), selectbackground=CTRL, selectforeground=FG)
+sty.map("TCombobox",
+        fieldbackground=[("readonly", CTRL), ("focus", CTRL)],
+        selectbackground=[("readonly", CTRL)],
+        selectforeground=[("readonly", FG)])
 root.option_add("*TCombobox*Listbox.background", CTRL)
 root.option_add("*TCombobox*Listbox.foreground", FG)
 root.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
 root.option_add("*TCombobox*Listbox.selectForeground", "white")
 root.option_add("*TCombobox*Listbox.font", (FONT, 12))
+sty.configure("TCheckbutton", background=BG, foreground=FG, font=(FONT, 12), indicatorsize=16)
+sty.map("TCheckbutton", background=[("active", BG)], foreground=[("active", FG)],
+        indicatorcolor=[("selected", ACCENT), ("!selected", CTRL)])
 
-# Checkbutton styling
-style.configure("TCheckbutton", background=BG, foreground=FG, font=(FONT, 12),
-                indicatorsize=16)
-style.map("TCheckbutton",
-          background=[("active", BG)],
-          foreground=[("active", FG)],
-          indicatorcolor=[("selected", ACCENT), ("!selected", CTRL)])
+# ── Rounded rect drawing ──
+def rr(canvas, x1, y1, x2, y2, r, **kw):
+    pts = [x1+r,y1, x2-r,y1, x2,y1, x2,y1+r,
+           x2,y2-r, x2,y2, x2-r,y2, x1+r,y2,
+           x1,y2, x1,y2-r, x1,y1+r, x1,y1]
+    return canvas.create_polygon(pts, smooth=True, **kw)
+
+class RBtn:
+    \"\"\"Canvas-based rounded button.\"\"\"
+    def __init__(self, parent, text, cmd, bg_color=CTRL, fg_color=FG,
+                 hover=CTRL_HL, w=90, h=30, r=RAD, font_t=(FONT, 11), parent_bg=BG):
+        self.c = tk.Canvas(parent, width=w, height=h, bg=parent_bg,
+                           highlightthickness=0, bd=0, cursor="hand2")
+        self._bg = bg_color
+        self._fg = fg_color
+        self._hover = hover
+        self._w, self._h, self._r = w, h, r
+        self._text = text
+        self._font = font_t
+        self._cmd = cmd
+        self._draw(bg_color)
+        self.c.bind("<Button-1>", lambda e: self._cmd())
+        self.c.bind("<Enter>", lambda e: self._draw(self._hover))
+        self.c.bind("<Leave>", lambda e: self._draw(self._bg))
+
+    def _draw(self, bg):
+        self.c.delete("all")
+        rr(self.c, 1, 1, self._w-1, self._h-1, self._r, fill=bg, outline="")
+        self.c.create_text(self._w//2, self._h//2, text=self._text,
+                           fill=self._fg, font=self._font)
+
+    def pack(self, **kw):
+        self.c.pack(**kw)
+
+    def config_text(self, text=None, fg=None):
+        self._text = text if text else self._text
+        self._fg = fg if fg else self._fg
+        self._draw(self._bg)
+
+    def disable(self):
+        self.c.unbind("<Button-1>")
+        self.c.config(cursor="")
 
 # ── Helpers ──
 def read_json(path, default):
@@ -181,80 +184,78 @@ def get_downloaded():
                     break
     return dl
 
-# ── Tab system ──
-tab_bar = ttk.Frame(root)
+def sep(parent):
+    f = tk.Frame(parent, bg=SEP, height=1)
+    f.pack(fill="x", padx=20, pady=8)
+
+# ── Tab bar (rounded pill buttons) ──
+tab_bar = tk.Frame(root, bg=BG)
 tab_bar.pack(fill="x", padx=20, pady=(16, 0))
 
 current_tab = tk.StringVar(value="settings")
 tab_frames = {{}}
-tab_btns = {{}}
+tab_canvases = {{}}
+TAB_W, TAB_H = 100, 32
 
-style.configure("Tab.TButton", background=BG, foreground=FG2,
-                font=(FONT, 12), padding=(14, 5))
-style.map("Tab.TButton", background=[("active", CTRL)])
-style.configure("TabActive.TButton", background=CTRL, foreground=FG,
-                font=(FONT, 12, "bold"), padding=(14, 5))
-style.map("TabActive.TButton", background=[("active", CTRL_HL)])
+def draw_tab(name, active):
+    c = tab_canvases[name]
+    c.delete("all")
+    bg = CTRL_HL if active else BG
+    fg = FG if active else FG2
+    rr(c, 1, 1, TAB_W-1, TAB_H-1, TAB_H//2, fill=bg, outline="")
+    font = (FONT, 11, "bold") if active else (FONT, 11)
+    c.create_text(TAB_W//2, TAB_H//2, text=name.title(), fill=fg, font=font)
 
 def switch_tab(name):
     current_tab.set(name)
     for n, f in tab_frames.items():
         f.pack_forget()
-    tab_frames[name].pack(fill="both", expand=True, padx=0, pady=(12, 16))
-    for n, b in tab_btns.items():
-        b.configure(style="TabActive.TButton" if n == name else "Tab.TButton")
+    tab_frames[name].pack(fill="both", expand=True, padx=0, pady=(10, 16))
+    for n in tab_canvases:
+        draw_tab(n, n == name)
+    # Refresh model dropdown when switching to settings (picks up new downloads)
+    if name == "settings":
+        refresh_model_dropdown()
 
-for tname, tlabel, ticon in [("settings", "Settings", "\\u2699"), ("models", "Models", "\\u25BC"), ("history", "History", "\\u23F0")]:
-    b = ttk.Button(tab_bar, text=f"{{ticon}}  {{tlabel}}", style="Tab.TButton",
-                   command=lambda n=tname: switch_tab(n))
-    b.pack(side="left", padx=(0, 4))
-    tab_btns[tname] = b
+for tname in ["settings", "models", "history"]:
+    c = tk.Canvas(tab_bar, width=TAB_W, height=TAB_H, bg=BG, highlightthickness=0, bd=0, cursor="hand2")
+    c.pack(side="left", padx=(0, 4))
+    c.bind("<Button-1>", lambda e, n=tname: switch_tab(n))
+    tab_canvases[tname] = c
 
-# ── Status ──
-sep0 = ttk.Frame(root, height=1)
-sep0.pack(fill="x", padx=20, pady=(10, 0))
-tk.Frame(sep0, bg=SEP, height=1).pack(fill="x")
+# ── Status line ──
+sep(root)
+status_row = tk.Frame(root, bg=BG)
+status_row.pack(fill="x", padx=20)
 
-status_row = ttk.Frame(root)
-status_row.pack(fill="x", padx=20, pady=(6, 0))
-
-status_dot = tk.Label(status_row, text="\\u25CF", font=(FONT, 7), bg=BG, fg=GREEN)
+status_dot = tk.Label(status_row, text="\\u25CF", font=(FONT, 8), bg=BG, fg=GREEN)
 status_dot.pack(side="left")
-status_lbl = ttk.Label(status_row, text="Ready", style="Dim.TLabel")
+status_lbl = tk.Label(status_row, text="Ready", font=(FONT, 10), bg=BG, fg=FG2)
 status_lbl.pack(side="left", padx=(5, 0))
 hotkey_lbl = tk.Label(status_row, text="", font=(MONO, 10), bg=BG, fg=FG3)
 hotkey_lbl.pack(side="right")
 
-sep1 = ttk.Frame(root, height=1)
-sep1.pack(fill="x", padx=20, pady=(6, 0))
-tk.Frame(sep1, bg=SEP, height=1).pack(fill="x")
+sep(root)
 
 # ════════════════════════════════════════
 # AUTOSAVE
 # ════════════════════════════════════════
-_init_done = [False]
-_save_pending = [False]
+_init = [False]
 
 def schedule_save(*_a):
-    if not _init_done[0]:
-        return
-    if not _save_pending[0]:
-        _save_pending[0] = True
-        root.after(250, do_save)
-
-def do_save():
-    _save_pending[0] = False
-    status_lbl.config(text="Saved", foreground=GREEN)
-    root.after(1200, lambda: status_lbl.config(foreground=FG2))
+    if _init[0]:
+        status_lbl.config(text="Saved", fg=GREEN)
+        root.after(1500, lambda: status_lbl.config(fg=FG2))
 
 # ════════════════════════════════════════
 # TAB: Settings
 # ════════════════════════════════════════
-sf = ttk.Frame(root)
+sf = tk.Frame(root, bg=BG)
 tab_frames["settings"] = sf
 
 def field_label(parent, text):
-    ttk.Label(parent, text=text, style="Dim.TLabel").pack(anchor="w", padx=20, pady=(12, 4))
+    tk.Label(parent, text=text, font=(FONT, 10), bg=BG, fg=FG2).pack(
+        anchor="w", padx=22, pady=(12, 4))
 
 def make_combo(parent, values, display_map, current):
     display_vals = [display_map.get(v, v) if display_map else v for v in values]
@@ -264,48 +265,67 @@ def make_combo(parent, values, display_map, current):
     var = tk.StringVar(value=cur)
     var.trace_add("write", schedule_save)
     cb = ttk.Combobox(parent, textvariable=var, values=display_vals,
-                       state="readonly", width=30, font=(FONT, 12))
+                       state="readonly", width=28, font=(FONT, 12))
     cb.pack(anchor="w", padx=20, pady=(0, 4))
-    return var, display_map
+    return var, display_map, cb
 
-def make_sep(parent):
-    f = ttk.Frame(parent, height=1)
-    f.pack(fill="x", padx=20, pady=6)
-    tk.Frame(f, bg=SEP, height=1).pack(fill="x")
+# Hotkey
+field_label(sf, "Hotkey")
+hotkey_var, hotkey_map, _ = make_combo(
+    sf, list(hotkeys.keys()), hotkeys,
+    cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"))
+sep(sf)
 
-def make_check(parent, text, current):
-    var = tk.BooleanVar(value=current)
-    var.trace_add("write", schedule_save)
-    ttk.Checkbutton(parent, text=text, variable=var).pack(anchor="w", padx=18, pady=3)
-    return var
-
-field_label(sf, "\\u2328  Hotkey")
-hotkey_var = make_combo(sf, list(hotkeys.keys()), hotkeys,
-                         cfg.get("hotkey", "fn" if is_mac else "Key.alt_r"))
-make_sep(sf)
-
-field_label(sf, "\\U0001F9E0  Model")
+# Model (only downloaded models)
+field_label(sf, "Model")
+model_frame = tk.Frame(sf, bg=BG)
+model_frame.pack(fill="x")
 downloaded = get_downloaded()
-available = [m for m in models if m in downloaded]
-if not available:
-    available = models[:1]
+available = [m for m in models if m in downloaded] or models[:1]
 cur_model = cfg.get("model", "small")
 if cur_model not in available:
     cur_model = available[0]
-model_var = make_combo(sf, available, {{}}, cur_model)
+model_var, _, model_cb = make_combo(model_frame, available, {{}}, cur_model)
+no_models_lbl = None
 if not downloaded:
-    ttk.Label(sf, text="No models yet \\u2014 download in Models tab",
-              foreground=ORANGE, font=(FONT, 10)).pack(anchor="w", padx=20, pady=(2, 0))
-make_sep(sf)
+    no_models_lbl = tk.Label(sf, text="No models yet. Go to Models tab to download.",
+                              font=(FONT, 10), bg=BG, fg=ORANGE)
+    no_models_lbl.pack(anchor="w", padx=22, pady=(2, 0))
+sep(sf)
 
-field_label(sf, "\\U0001F310  Language")
-lang_var = make_combo(sf, langs, lang_names, cfg.get("language", "auto"))
-make_sep(sf)
+def refresh_model_dropdown():
+    \"\"\"Rebuild model dropdown to reflect newly downloaded models.\"\"\"
+    global no_models_lbl
+    dl = get_downloaded()
+    avail = [m for m in models if m in dl] or models[:1]
+    cur = model_var[0].get()
+    if cur not in avail:
+        cur = avail[0]
+    model_cb.config(values=avail)
+    model_var[0].set(cur)
+    if no_models_lbl:
+        if dl:
+            no_models_lbl.pack_forget()
+        else:
+            no_models_lbl.pack(anchor="w", padx=22, pady=(2, 0))
 
-paste_var = make_check(sf, "  Auto-paste after transcription", cfg.get("auto_paste", True))
-gpu_var = make_check(sf, "  Use GPU (CUDA)", cfg.get("gpu_enabled", True))
+# Language
+field_label(sf, "Language")
+lang_var, lang_map, _ = make_combo(sf, langs, lang_names, cfg.get("language", "auto"))
+sep(sf)
 
-# On close: output final config
+# Toggles
+paste_var = tk.BooleanVar(value=cfg.get("auto_paste", True))
+paste_var.trace_add("write", schedule_save)
+ttk.Checkbutton(sf, text="Auto-paste after transcription", variable=paste_var).pack(
+    anchor="w", padx=18, pady=3)
+
+gpu_var = tk.BooleanVar(value=cfg.get("gpu_enabled", True))
+gpu_var.trace_add("write", schedule_save)
+ttk.Checkbutton(sf, text="Use GPU (CUDA)", variable=gpu_var).pack(
+    anchor="w", padx=18, pady=3)
+
+# Output config on window close
 def on_close():
     result = dict(cfg)
     rev_hk = {{v: k for k, v in hotkeys.items()}}
@@ -323,14 +343,17 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 # ════════════════════════════════════════
 # TAB: Models
 # ════════════════════════════════════════
-mf = ttk.Frame(root)
+mf = tk.Frame(root, bg=BG)
 tab_frames["models"] = mf
 
 m_canvas = tk.Canvas(mf, bg=BG, highlightthickness=0, bd=0)
-m_inner = ttk.Frame(m_canvas)
+m_inner = tk.Frame(m_canvas, bg=BG)
 m_inner.bind("<Configure>", lambda e: m_canvas.configure(scrollregion=m_canvas.bbox("all")))
 m_canvas.create_window((0, 0), window=m_inner, anchor="nw")
 m_canvas.pack(fill="both", expand=True)
+
+def _mw_models(event):
+    m_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
 
 def build_models():
     for w in m_inner.winfo_children():
@@ -339,28 +362,29 @@ def build_models():
     for i, name in enumerate(models):
         info = model_info.get(name, {{}})
         is_dl = name in dl
-        row = ttk.Frame(m_inner)
-        row.pack(fill="x", padx=20, pady=(8, 0))
 
-        left = ttk.Frame(row)
+        row = tk.Frame(m_inner, bg=BG)
+        row.pack(fill="x", padx=20, pady=(10, 0))
+
+        left = tk.Frame(row, bg=BG)
         left.pack(side="left", fill="x", expand=True)
 
         title = name
         if info.get("recommended"):
-            title += "  \\u2B50"
-        ttk.Label(left, text=title, font=(FONT, 13, "bold")).pack(anchor="w")
+            title += "  (recommended)"
+        tk.Label(left, text=title, font=(FONT, 13, "bold"), bg=BG, fg=FG).pack(anchor="w")
 
         sp = info.get("speed", 0)
         qu = info.get("quality", 0)
         sz = info.get("size", "")
-        meta = f"{{sz}}  \\u00B7  Speed {{sp}}/5  \\u00B7  Quality {{qu}}/5"
-        ttk.Label(left, text=meta, style="Dim.TLabel").pack(anchor="w", pady=(1, 0))
+        meta = f"{{sz}}   Speed {{sp}}/5   Quality {{qu}}/5"
+        tk.Label(left, text=meta, font=(FONT, 10), bg=BG, fg=FG2).pack(anchor="w", pady=(2, 0))
 
-        right = ttk.Frame(row)
+        right = tk.Frame(row, bg=BG)
         right.pack(side="right")
 
         if is_dl:
-            ttk.Label(right, text="\\u2713", foreground=GREEN, font=(FONT, 14)).pack(side="left", padx=(0, 8))
+            tk.Label(right, text="Downloaded", font=(FONT, 10), bg=BG, fg=GREEN).pack(side="left", padx=(0, 10))
             def mk_del(m):
                 def do_del():
                     subprocess.Popen([
@@ -370,13 +394,13 @@ def build_models():
                     ])
                     root.after(600, build_models)
                 return do_del
-            ttk.Button(right, text="Remove", style="Danger.TButton",
-                       command=mk_del(name)).pack(side="left")
+            RBtn(right, "Remove", mk_del(name), bg_color=CTRL, fg_color=RED,
+                 hover=CTRL_HL, w=80, h=28, font_t=(FONT, 10)).pack(side="left")
         else:
-            def mk_dl(m, bref):
+            def mk_dl(m, btn_ref):
                 def do_dl():
-                    bref[0].config(text="Downloading...")
-                    bref[0].state(["disabled"])
+                    btn_ref[0].disable()
+                    btn_ref[0].config_text("Loading...", fg=ORANGE)
                     def run():
                         subprocess.run([
                             sys.executable, "-c",
@@ -387,58 +411,56 @@ def build_models():
                     threading.Thread(target=run, daemon=True).start()
                 return do_dl
             bref = [None]
-            b = ttk.Button(right, text="\\u2913  Download", style="Download.TButton")
+            b = RBtn(right, "Download", lambda: None, bg_color=ACCENT, fg_color="white",
+                     hover="#0070E0", w=100, h=28, font_t=(FONT, 10, "bold"))
             bref[0] = b
-            b.config(command=mk_dl(name, bref))
+            b._cmd = mk_dl(name, bref)
             b.pack(side="left")
 
         if i < len(models) - 1:
-            f = ttk.Frame(m_inner, height=1)
-            f.pack(fill="x", padx=20, pady=(8, 0))
-            tk.Frame(f, bg=SEP, height=1).pack(fill="x")
+            tk.Frame(m_inner, bg=SEP, height=1).pack(fill="x", padx=20, pady=(10, 0))
 
 build_models()
 
 # ════════════════════════════════════════
 # TAB: History
 # ════════════════════════════════════════
-hf = ttk.Frame(root)
+hf = tk.Frame(root, bg=BG)
 tab_frames["history"] = hf
 
 h_canvas = tk.Canvas(hf, bg=BG, highlightthickness=0, bd=0)
-h_scroll = ttk.Scrollbar(hf, orient="vertical", command=h_canvas.yview)
-h_inner = ttk.Frame(h_canvas)
+h_inner = tk.Frame(h_canvas, bg=BG)
 h_inner.bind("<Configure>", lambda e: h_canvas.configure(scrollregion=h_canvas.bbox("all")))
 h_canvas.create_window((0, 0), window=h_inner, anchor="nw")
-h_canvas.configure(yscrollcommand=h_scroll.set)
+h_canvas.pack(fill="both", expand=True)
 
-def _mw(event):
+def _mw_hist(event):
     h_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
-h_canvas.bind_all("<MouseWheel>", _mw)
-h_scroll.pack(side="right", fill="y")
-h_canvas.pack(side="left", fill="both", expand=True)
 
 def build_history():
     for w in h_inner.winfo_children():
         w.destroy()
     history = read_json(history_path, [])
     if not history:
-        ttk.Label(h_inner, text="No transcripts yet.", style="Dim.TLabel").pack(
-            anchor="w", padx=20, pady=20)
+        tk.Label(h_inner, text="No transcripts yet.", font=(FONT, 11),
+                 bg=BG, fg=FG2).pack(anchor="w", padx=20, pady=20)
         return
     for i, entry in enumerate(history[:20]):
         stamp = entry.get("timestamp", "")
         text = entry.get("text", "")
-        row = ttk.Frame(h_inner)
+
+        row = tk.Frame(h_inner, bg=BG)
         row.pack(fill="x", padx=20, pady=(10, 0))
-        hdr = ttk.Frame(row)
+
+        hdr = tk.Frame(row, bg=BG)
         hdr.pack(fill="x")
+
         time_s = stamp.split(" ")[-1] if " " in stamp else stamp
         date_s = stamp.split(" ")[0] if " " in stamp else ""
-        ttk.Label(hdr, text=f"\\u23F0 {{time_s}}", font=(MONO, 10), foreground=FG2).pack(side="left")
-        ttk.Label(hdr, text=date_s, style="Tiny.TLabel").pack(side="left", padx=(8, 0))
+        tk.Label(hdr, text=time_s, font=(MONO, 10), bg=BG, fg=FG2).pack(side="left")
+        tk.Label(hdr, text=date_s, font=(FONT, 9), bg=BG, fg=FG3).pack(side="left", padx=(8, 0))
 
-        def mk_copy(t, btn):
+        def mk_copy(t, btn_ref):
             def do_copy():
                 if is_mac:
                     p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
@@ -446,26 +468,36 @@ def build_history():
                 else:
                     root.clipboard_clear()
                     root.clipboard_append(t)
-                btn.config(text="\\u2713 Copied")
-                root.after(1000, lambda: btn.config(text="\\u2398 Copy"))
+                btn_ref[0].config_text("Copied", fg=GREEN)
+                root.after(1000, lambda: btn_ref[0].config_text("Copy", fg=FG2))
             return do_copy
 
-        cb = ttk.Button(hdr, text="\\u2398 Copy", style="Small.TButton")
-        cb.pack(side="right")
-        cb.config(command=mk_copy(text, cb))
+        bref = [None]
+        b = RBtn(hdr, "Copy", lambda: None, bg_color=CTRL, fg_color=FG2,
+                 hover=CTRL_HL, w=65, h=24, r=7, font_t=(FONT, 10))
+        bref[0] = b
+        b._cmd = mk_copy(text, bref)
+        b.pack(side="right")
 
-        ttk.Label(row, text=text, wraplength=480, justify="left",
-                  font=(FONT, 12)).pack(fill="x", pady=(4, 0))
+        tk.Label(row, text=text, font=(FONT, 12), bg=BG, fg=FG,
+                 anchor="w", justify="left", wraplength=480).pack(fill="x", pady=(4, 0))
 
         if i < min(len(history), 20) - 1:
-            sf2 = ttk.Frame(h_inner, height=1)
-            sf2.pack(fill="x", padx=20, pady=(10, 0))
-            tk.Frame(sf2, bg=SEP, height=1).pack(fill="x")
+            tk.Frame(h_inner, bg=SEP, height=1).pack(fill="x", padx=20, pady=(10, 0))
 
     h_canvas.update_idletasks()
     h_canvas.configure(scrollregion=h_canvas.bbox("all"))
 
-# ── Polling ──
+# ── Mousewheel binding ──
+def _mw_global(event):
+    tab = current_tab.get()
+    if tab == "history":
+        h_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+    elif tab == "models":
+        m_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+root.bind_all("<MouseWheel>", _mw_global)
+
+# ── Status polling ──
 def refresh(sched=True):
     status = read_json(status_path, {{}})
     state = status.get("state", "hidden")
@@ -479,7 +511,7 @@ def refresh(sched=True):
     elif state == "loading":
         lbl, dot = detail, ACCENT
     elif state == "listening":
-        lbl, dot = "\\u25CF  Listening", RED
+        lbl, dot = "Listening", RED
     elif state == "transcribing":
         lbl, dot = "Transcribing...", ORANGE
     elif state in ("done", "hidden"):
@@ -489,18 +521,17 @@ def refresh(sched=True):
         lbl, dot = detail or "Ready", FG2
 
     status_dot.config(fg=dot)
-    if not _save_pending[0]:
-        status_lbl.config(text=lbl)
+    status_lbl.config(text=lbl)
     hotkey_lbl.config(text=hk)
 
     if current_tab.get() == "history":
         build_history()
 
     if sched:
-        root.after(1200, refresh)
+        root.after(1500, refresh)
 
 # ── Init ──
-_init_done[0] = True
+_init[0] = True
 switch_tab("settings")
 refresh()
 root.mainloop()
