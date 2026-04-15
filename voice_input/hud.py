@@ -14,10 +14,10 @@ class HudState:
 
 # Subtle, muted colors
 _COLORS = {
-    HudState.LISTENING: ("#1A1A1A", "#FF4444"),     # Dark bg, red text
-    HudState.TRANSCRIBING: ("#1A1A1A", "#BBBBBB"),  # Dark bg, gray text
-    HudState.DONE: ("#1A1A1A", "#66BB6A"),           # Dark bg, green text
-    HudState.ERROR: ("#1A1A1A", "#EF5350"),          # Dark bg, red text
+    HudState.LISTENING: ("#FFFFFF", "#FF3B30"),     # White bg, red text
+    HudState.TRANSCRIBING: ("#FFFFFF", "#8E8E93"),  # White bg, gray text
+    HudState.DONE: ("#FFFFFF", "#34C759"),           # White bg, green text
+    HudState.ERROR: ("#FFFFFF", "#FF3B30"),          # White bg, red text
 }
 
 _LABELS = {
@@ -29,10 +29,10 @@ _LABELS = {
 
 # Small dot indicators
 _DOTS = {
-    HudState.LISTENING: "#FF4444",
-    HudState.TRANSCRIBING: "#FFA726",
-    HudState.DONE: "#66BB6A",
-    HudState.ERROR: "#EF5350",
+    HudState.LISTENING: "#FF3B30",
+    HudState.TRANSCRIBING: "#FF9500",
+    HudState.DONE: "#34C759",
+    HudState.ERROR: "#FF3B30",
 }
 
 PILL_WIDTH = 150
@@ -270,9 +270,9 @@ class _TkHud:
 
         # Rounded pill background
         r = PILL_HEIGHT // 2
-        self._canvas.create_arc(0, 0, PILL_HEIGHT, PILL_HEIGHT, start=90, extent=180, fill="#1A1A1A", outline="")
-        self._canvas.create_arc(PILL_WIDTH - PILL_HEIGHT, 0, PILL_WIDTH, PILL_HEIGHT, start=-90, extent=180, fill="#1A1A1A", outline="")
-        self._canvas.create_rectangle(r, 0, PILL_WIDTH - r, PILL_HEIGHT, fill="#1A1A1A", outline="")
+        self._canvas.create_arc(0, 0, PILL_HEIGHT, PILL_HEIGHT, start=90, extent=180, fill="#FFFFFF", outline="")
+        self._canvas.create_arc(PILL_WIDTH - PILL_HEIGHT, 0, PILL_WIDTH, PILL_HEIGHT, start=-90, extent=180, fill="#FFFFFF", outline="")
+        self._canvas.create_rectangle(r, 0, PILL_WIDTH - r, PILL_HEIGHT, fill="#FFFFFF", outline="")
 
         # Dot - vertically centered
         dot_y = (PILL_HEIGHT - DOT_SIZE) // 2
