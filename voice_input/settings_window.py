@@ -308,7 +308,7 @@ class Toggle:
 
     def _draw(self):
         self.c.delete("all")
-        bg = GREEN if self._on else SEP
+        bg = FG2 if self._on else SEP
         rr(self.c, 0, 0, self.W, self.H, self.H//2, fill=bg, outline="")
         cx = self.W - 9 if self._on else 9
         self.c.create_oval(cx-6, 3, cx+6, self.H-3, fill="white", outline="")
@@ -370,10 +370,6 @@ paste_toggle = Toggle(sf, "Auto-paste after transcription",
                        cfg.get("auto_paste", True), on_change=schedule_save)
 paste_toggle.pack(anchor="w", padx=20, pady=6)
 
-gpu_toggle = Toggle(sf, "Use GPU (CUDA)",
-                     cfg.get("gpu_enabled", True), on_change=schedule_save)
-gpu_toggle.pack(anchor="w", padx=20, pady=6)
-
 # Output config on window close
 def on_close():
     result = dict(cfg)
@@ -383,7 +379,6 @@ def on_close():
     rev_lang = {{v: k for k, v in lang_names.items()}}
     result["language"] = rev_lang.get(lg_pill.get(), lg_pill.get())
     result["auto_paste"] = paste_toggle.get()
-    result["gpu_enabled"] = gpu_toggle.get()
     print(json.dumps(result))
     root.destroy()
 
@@ -402,7 +397,7 @@ m_canvas.create_window((0, 0), window=m_inner, anchor="nw")
 m_canvas.pack(fill="both", expand=True)
 
 def _mw_models(event):
-    m_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+    m_canvas.yview_scroll((-1 if event.delta > 0 else 1) if is_mac else (-event.delta // 120), "units")
 
 def build_models():
     for w in m_inner.winfo_children():
@@ -483,7 +478,7 @@ h_canvas.create_window((0, 0), window=h_inner, anchor="nw")
 h_canvas.pack(fill="both", expand=True)
 
 def _mw_hist(event):
-    h_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+    h_canvas.yview_scroll((-1 if event.delta > 0 else 1) if is_mac else (-event.delta // 120), "units")
 
 def build_history():
     for w in h_inner.winfo_children():
@@ -554,9 +549,9 @@ def build_history():
 def _mw_global(event):
     tab = current_tab.get()
     if tab == "history":
-        h_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+        h_canvas.yview_scroll((-1 if event.delta > 0 else 1) if is_mac else (-event.delta // 120), "units")
     elif tab == "models":
-        m_canvas.yview_scroll(-1 * (event.delta // 120 or (1 if event.delta > 0 else -1)), "units")
+        m_canvas.yview_scroll((-1 if event.delta > 0 else 1) if is_mac else (-event.delta // 120), "units")
 root.bind_all("<MouseWheel>", _mw_global)
 
 # ── Status polling ──
