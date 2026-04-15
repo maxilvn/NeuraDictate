@@ -223,7 +223,7 @@ class VoiceInputApp:
             unload_model()
             threading.Thread(target=warm_up_model, args=(dict(self._cfg),), daemon=True).start()
 
-        log.info("Config applied: hotkey=%s model=%s", new_cfg.get("hotkey"), new_cfg.get("model"))
+        log.info("Config applied: hotkey=%s model=%s language=%s", new_cfg.get("hotkey"), new_cfg.get("model"), new_cfg.get("language"))
         self._write_status(HudState.HIDDEN, "Settings saved")
 
     def _open_control_panel(self, blocking: bool = False) -> None:

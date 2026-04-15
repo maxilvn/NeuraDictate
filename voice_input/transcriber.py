@@ -176,6 +176,7 @@ def transcribe(wav_path: str, cfg: dict) -> str:
     elif _detected_language:
         kwargs["language"] = _detected_language
 
+    log.info("Transcribe: output_language=%s task=%s kwargs=%s", output_language, task, kwargs)
     t0 = time.monotonic()
 
     segments, info = model.transcribe(
