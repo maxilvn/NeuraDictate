@@ -222,29 +222,50 @@ class _MacHud:
             self._panel.display()
             self._panel.orderFront_(None)
 
-            if state == HudState.TRANSCRIBING and self._icon_view:
+            if state == HudState.LISTENING and self._icon_view:
+                # Gentle breathing animation (opacity pulse)
+                self._pulse_growing = False
+                self._pulse_alpha = 1.0
+                def _breathe(_):
+                    if self._current_state != HudState.LISTENING or not self._icon_view:
+                        return
+                    if self._pulse_growing:
+                        self._pulse_alpha += 0.04
+                        if self._pulse_alpha >= 1.0:
+                            self._pulse_alpha = 1.0
+                            self._pulse_growing = False
+                    else:
+                        self._pulse_alpha -= 0.04
+                        if self._pulse_alpha <= 0.3:
+                            self._pulse_alpha = 0.3
+                            self._pulse_growing = True
+                    self._icon_view.setAlphaValue_(self._pulse_alpha)
+                self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
+                    0.05, True, _breathe)
+
+            elif state == HudState.TRANSCRIBING and self._icon_view:
+                # Fast size pulse
                 self._pulse_growing = True
                 self._pulse_size = 14
-                # Position icon initially
                 iy = (PILL_HEIGHT - self._pulse_size) / 2
                 self._icon_view.setFrame_(((content_x, iy), (self._pulse_size, self._pulse_size)))
                 def _pulse(_):
                     if self._current_state != HudState.TRANSCRIBING or not self._icon_view:
                         return
                     if self._pulse_growing:
-                        self._pulse_size += 0.5
-                        if self._pulse_size >= 18:
+                        self._pulse_size += 1
+                        if self._pulse_size >= 20:
                             self._pulse_growing = False
                     else:
-                        self._pulse_size -= 0.5
-                        if self._pulse_size <= 12:
+                        self._pulse_size -= 1
+                        if self._pulse_size <= 10:
                             self._pulse_growing = True
                     s = self._pulse_size
                     iy = (PILL_HEIGHT - s) / 2
                     self._icon_view.setFrame_(((content_x, iy), (s, s)))
                     self._icon_view.setNeedsDisplay_(True)
                 self._pulse_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
-                    0.08, True, _pulse)
+                    0.04, True, _pulse)
 
             if state in (HudState.DONE, HudState.ERROR):
                 self._hide_timer = AppKit.NSTimer.scheduledTimerWithTimeInterval_repeats_block_(
