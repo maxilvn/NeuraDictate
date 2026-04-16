@@ -67,7 +67,15 @@ xcopy /E /I /Q /Y "%PROJ_DIR%\voice_input" "%INSTALL_DIR%\voice_input" >nul
 copy /Y "%PROJ_DIR%\start.py" "%INSTALL_DIR%\start.py" >nul
 copy /Y "%PROJ_DIR%\icon.png" "%INSTALL_DIR%\icon.png" >nul
 copy /Y "%PROJ_DIR%\logo.png" "%INSTALL_DIR%\logo.png" >nul
-copy /Y "%PROJ_DIR%\VoiceInput-Windows.vbs" "%INSTALL_DIR%\NeuraDictate.vbs" >nul
+
+:: Create NeuraDictate.vbs (silent launcher, no console window)
+(
+echo Set fso = CreateObject^("Scripting.FileSystemObject"^)
+echo dir = fso.GetParentFolderName^(WScript.ScriptFullName^)
+echo Set shell = CreateObject^("WScript.Shell"^)
+echo shell.CurrentDirectory = dir
+echo shell.Run "pythonw """ ^& dir ^& "\start.py""", 0, False
+) > "%INSTALL_DIR%\NeuraDictate.vbs"
 
 :: Convert PNG to ICO
 powershell -NoProfile -Command ^

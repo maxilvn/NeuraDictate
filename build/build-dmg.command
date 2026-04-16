@@ -64,45 +64,48 @@ cd "$BUNDLE_DIR"
 LOG="$HOME/.cache/voice-input/app-launch.log"
 mkdir -p "$(dirname "$LOG")"
 
-# Find a REAL python3 (not Xcode stub, which has no pip and no tkinter)
-# Priority: Homebrew > miniforge/conda > pyenv > python.org > /usr/bin (fallback)
-PY=""
-for p in /opt/homebrew/bin/python3 /opt/homebrew/bin/python3.12 /opt/homebrew/bin/python3.11 \
-         /usr/local/bin/python3 /usr/local/bin/python3.12 /usr/local/bin/python3.11 \
-         "$HOME/miniforge3/bin/python3" "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" \
-         "$HOME/.pyenv/shims/python3" \
+# Use isolated venv — no conflicts with system/Homebrew/miniforge
+VENV="$HOME/.cache/voice-input/venv"
+VENV_PY="$VENV/bin/python3"
+
+# Find any Python3 to bootstrap the venv
+BOOTSTRAP_PY=""
+for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3 \
+         "$HOME/miniforge3/bin/python3" "$HOME/.pyenv/shims/python3" \
          /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 \
-         /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 \
-         /Library/Frameworks/Python.framework/Versions/3.11/bin/python3; do
-    if [ -x "$p" ]; then
-        # Verify it has pip (Xcode stub doesn't)
-        if "$p" -m pip --version >/dev/null 2>&1; then
-            PY="$p"
-            break
-        fi
+         /Library/Frameworks/Python.framework/Versions/3.12/bin/python3; do
+    if [ -x "$p" ] && "$p" -c "import venv" >/dev/null 2>&1; then
+        BOOTSTRAP_PY="$p"
+        break
     fi
 done
-# Last resort: check PATH (avoid Xcode stub)
-if [ -z "$PY" ]; then
-    PATH_PY="$(command -v python3 2>/dev/null || echo '')"
-    if [ -n "$PATH_PY" ] && [[ "$PATH_PY" != *"Xcode"* ]] && "$PATH_PY" -m pip --version >/dev/null 2>&1; then
-        PY="$PATH_PY"
-    fi
+if [ -z "$BOOTSTRAP_PY" ]; then
+    BOOTSTRAP_PY="$(command -v python3 2>/dev/null || echo '')"
 fi
-if [ -z "$PY" ]; then
-    osascript -e 'display dialog "Python 3 mit pip wird benoetigt.\n\nInstalliere es von python.org oder via Homebrew:\nbrew install python" buttons {"OK"} default button 1 with icon caution with title "NeuraDictate"' 2>/dev/null
+if [ -z "$BOOTSTRAP_PY" ]; then
+    osascript -e 'display dialog "Python 3 wird benoetigt.\n\nBitte von python.org installieren." buttons {"OK"} default button 1 with icon caution with title "NeuraDictate"' 2>/dev/null
     exit 1
 fi
-echo "Using Python: $PY" >> "$LOG"
+
+# Create venv on first run
+if [ ! -x "$VENV_PY" ]; then
+    osascript -e 'display notification "Erstelle Python Umgebung..." with title "NeuraDictate"' &
+    "$BOOTSTRAP_PY" -m venv "$VENV" >> "$LOG" 2>&1 || {
+        # venv module might not include pip — use --without-pip + ensurepip
+        "$BOOTSTRAP_PY" -m venv --without-pip "$VENV" >> "$LOG" 2>&1
+        "$VENV_PY" -m ensurepip >> "$LOG" 2>&1
+    }
+fi
+PY="$VENV_PY"
+echo "Using venv Python: $PY" >> "$LOG"
 
 # First run: install deps
 MARKER="$HOME/.cache/voice-input/.deps-installed"
 if [ ! -f "$MARKER" ]; then
     osascript -e 'display notification "Installiere Dependencies... (dauert 1-2 Min)" with title "NeuraDictate"' &
-    # Try --user first, fallback to --break-system-packages for managed envs
-    "$PY" -m pip install --quiet --user faster-whisper sounddevice numpy rumps \
-        pyobjc-framework-Quartz pyobjc-framework-Cocoa >> "$LOG" 2>&1 \
-    || "$PY" -m pip install --quiet --break-system-packages faster-whisper sounddevice numpy rumps \
+    # venv has no PEP 668 issues, just install
+    "$PY" -m pip install --quiet --upgrade pip >> "$LOG" 2>&1
+    "$PY" -m pip install --quiet faster-whisper sounddevice numpy rumps \
         pyobjc-framework-Quartz pyobjc-framework-Cocoa >> "$LOG" 2>&1
     if [ $? -eq 0 ]; then
         touch "$MARKER"

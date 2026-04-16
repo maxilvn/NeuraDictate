@@ -41,14 +41,25 @@ def ensure_deps():
             missing.append(pip_name)
 
     if missing:
-        # pythonw on Windows has no stdout, so guard prints
         try:
             print(f"Installing: {', '.join(missing)}...")
         except Exception:
             pass
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--quiet"] + missing
-        )
+        # Try multiple install strategies for different Python setups
+        attempts = [
+            [sys.executable, "-m", "pip", "install", "--quiet", "--user"] + missing,
+            [sys.executable, "-m", "pip", "install", "--quiet", "--break-system-packages"] + missing,
+            [sys.executable, "-m", "pip", "install", "--quiet"] + missing,
+        ]
+        last_err = None
+        for cmd in attempts:
+            try:
+                subprocess.check_call(cmd)
+                break
+            except subprocess.CalledProcessError as e:
+                last_err = e
+        else:
+            raise last_err
 
 
 if __name__ == "__main__":
