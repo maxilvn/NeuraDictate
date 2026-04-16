@@ -151,13 +151,28 @@ root.title(app_name)
 root.configure(bg=BG)
 root.resizable(True, True)
 root.minsize(480, 540)
-root.attributes("-topmost", True)
 root.geometry("560x660")
 root.update_idletasks()
 w, h = root.winfo_width(), root.winfo_height()
 x = (root.winfo_screenwidth() - w) // 2
 y = (root.winfo_screenheight() - h) // 2
 root.geometry(f"{{w}}x{{h}}+{{x}}+{{y}}")
+
+# Force window to front on open
+root.lift()
+root.attributes("-topmost", True)
+root.after(200, lambda: root.attributes("-topmost", False))
+if is_mac:
+    # Bring this process to front (LSUIElement parent doesn't auto-activate)
+    import subprocess as _sp, os as _os
+    try:
+        _sp.Popen(["osascript", "-e",
+            'tell application "System Events" to set frontmost of '
+            '(first process whose unix id is {{}}) to true'.format(_os.getpid())],
+            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+    except Exception:
+        pass
+root.focus_force()
 
 # ── ttk clam theme (allows color control on macOS) ──
 sty = ttk.Style()
