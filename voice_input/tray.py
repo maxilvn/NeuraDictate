@@ -45,7 +45,50 @@ class _MacTray:
             rumps.quit_application()
 
         self._app.menu = ["Pause / Resume", "Control Panel", None, "Quit"]
+
+        # Install reopen-event handler so dock/Finder clicks open settings
+        self._install_reopen_handler()
+
         self._app.run()
+
+    def _install_reopen_handler(self):
+        """When user clicks app icon in Dock/Applications while running, open settings."""
+        try:
+            import AppKit
+            from PyObjCTools.AppHelper import callAfter
+
+            _on_settings = self._on_settings
+
+            class _ReopenDelegate(AppKit.NSObject):
+                def applicationShouldHandleReopen_hasVisibleWindows_(self, app, has_visible):
+                    try:
+                        _on_settings()
+                    except Exception:
+                        pass
+                    return False
+
+            # rumps sets up its own delegate. We wrap it.
+            nsapp = AppKit.NSApplication.sharedApplication()
+            existing = nsapp.delegate()
+            self._reopen_delegate = _ReopenDelegate.alloc().init()
+
+            # Method swizzling via category not needed — just add the method to existing delegate class
+            if existing is not None:
+                # Add method to existing delegate's class
+                from objc import selector
+                sel_name = "applicationShouldHandleReopen:hasVisibleWindows:"
+                def _handler(self, app, has_visible):
+                    try:
+                        _on_settings()
+                    except Exception:
+                        pass
+                    return False
+                try:
+                    existing.__class__.applicationShouldHandleReopen_hasVisibleWindows_ = _handler
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def stop(self) -> None:
         try:

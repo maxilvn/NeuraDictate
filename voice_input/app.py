@@ -237,14 +237,14 @@ class VoiceInputApp:
         self._write_status(HudState.HIDDEN, "Settings saved")
 
     def _open_control_panel(self, blocking: bool = False) -> None:
-        # If a panel is already open, just focus it instead of opening a second
+        log.info("_open_control_panel called (is_open=%s)", SettingsWindow.is_open())
         if SettingsWindow.is_open() and not blocking:
+            log.info("Panel already open, focusing")
             SettingsWindow.focus_existing()
             return
 
         def on_save(new_cfg: dict):
             self._panel_open = False
-            # Update mtime so the watcher doesn't re-apply the same change
             try:
                 if config.CONFIG_PATH.exists():
                     self._config_mtime = config.CONFIG_PATH.stat().st_mtime
