@@ -9,4 +9,8 @@ NeuraDictate.dmg
 NeuraDictate-Windows.zip
 NeuraDictate.app/
 icon.ico
+icon.icns
 /tmp/
+dist/
+build_pyinstaller/
+*.spec.bak

@@ -35,32 +35,52 @@ class SettingsWindow:
 
     def show(self, blocking: bool = False) -> None:
         """Launch control panel as a separate Python process."""
-        # If already open, just focus it
         if SettingsWindow.is_open():
             SettingsWindow.focus_existing()
             return
 
         def _run():
+            import os as _os
+            import tempfile as _tempfile
             script = _build_settings_script(self._cfg)
-            proc = subprocess.Popen(
-                [sys.executable, "-c", script],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+            # Write script to temp file — works in PyInstaller bundle (no `-c`)
+            tmp = _tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=False, encoding="utf-8"
             )
-            SettingsWindow._current_proc = proc
             try:
-                stdout, _ = proc.communicate()
-                if proc.returncode == 0 and stdout.strip():
-                    try:
-                        new_cfg = json.loads(stdout.strip())
-                        self._cfg.update(new_cfg)
-                        self._on_save(self._cfg)
-                    except json.JSONDecodeError:
-                        pass
-            finally:
-                if SettingsWindow._current_proc is proc:
-                    SettingsWindow._current_proc = None
+                tmp.write(script)
+                tmp.close()
+                env = dict(_os.environ,
+                            NEURADICTATE_MODE="exec_script",
+                            NEURADICTATE_SCRIPT=tmp.name)
+                # Clear any headless flag so subprocess doesn't re-exec itself
+                env.pop("NEURADICTATE_HEADLESS", None)
+                proc = subprocess.Popen(
+                    [sys.executable],
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                SettingsWindow._current_proc = proc
+                try:
+                    stdout, _err = proc.communicate()
+                    if proc.returncode == 0 and stdout.strip():
+                        try:
+                            new_cfg = json.loads(stdout.strip())
+                            self._cfg.update(new_cfg)
+                            self._on_save(self._cfg)
+                        except json.JSONDecodeError:
+                            pass
+                finally:
+                    if SettingsWindow._current_proc is proc:
+                        SettingsWindow._current_proc = None
+            except Exception:
+                try:
+                    _os.unlink(tmp.name)
+                except OSError:
+                    pass
+                raise
 
         if blocking:
             _run()
@@ -648,11 +668,14 @@ def build_models():
         if is_dl:
             def mk_del(m):
                 def do_del():
-                    subprocess.Popen([
-                        sys.executable, "-c",
-                        f"import sys; sys.path.insert(0, str(r'{{project_dir.parent}}')); "
-                        f"from voice_input.transcriber import delete_model; delete_model('{{m}}')"
-                    ])
+                    import os as _os
+                    _env = dict(_os.environ,
+                                NEURADICTATE_MODE="delete_model",
+                                NEURADICTATE_MODEL=m)
+                    _env.pop("NEURADICTATE_HEADLESS", None)
+                    subprocess.Popen([sys.executable], env=_env,
+                                      stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL)
                     root.after(600, build_models)
                 return do_del
             RBtn(right, "Remove", mk_del(name), bg_color=CTRL, fg_color=FG2,
@@ -663,11 +686,14 @@ def build_models():
                     btn_ref[0].disable()
                     btn_ref[0].config_text("Downloading...", fg=ORANGE)
                     def run():
-                        subprocess.run([
-                            sys.executable, "-c",
-                            f"import sys; sys.path.insert(0, str(r'{{project_dir.parent}}')); "
-                            f"from voice_input.transcriber import download_model; download_model('{{m}}')"
-                        ])
+                        import os as _os
+                        _env = dict(_os.environ,
+                                    NEURADICTATE_MODE="download_model",
+                                    NEURADICTATE_MODEL=m)
+                        _env.pop("NEURADICTATE_HEADLESS", None)
+                        subprocess.run([sys.executable], env=_env,
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
                         root.after(0, build_models)
                     threading.Thread(target=run, daemon=True).start()
                 return do_dl

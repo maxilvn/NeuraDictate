@@ -1,9 +1,60 @@
-"""Auto-install dependencies if missing, then launch Voice Input."""
+"""Entry point - handles subprocess modes and launches main app."""
 
-import subprocess
-import sys
 import os
+import sys
+import subprocess
 import io
+
+# ──────────────────────────────────────────────────────────────────────
+# Subprocess mode handling (for PyInstaller bundles and dev mode alike)
+# Must be at the top before any heavy imports.
+# ──────────────────────────────────────────────────────────────────────
+_MODE = os.environ.get("NEURADICTATE_MODE", "")
+
+
+def _prepend_bundle_path():
+    """Add PyInstaller bundle path to sys.path if frozen."""
+    bundle_dir = getattr(sys, "_MEIPASS", None)
+    if bundle_dir and bundle_dir not in sys.path:
+        sys.path.insert(0, bundle_dir)
+    # Also add the directory containing this file (dev mode)
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here and here not in sys.path:
+        sys.path.insert(0, here)
+
+
+if _MODE == "exec_script":
+    # Run a Python script from a temp file (replaces `python -c script`)
+    _prepend_bundle_path()
+    _script_path = os.environ.get("NEURADICTATE_SCRIPT", "")
+    if _script_path and os.path.exists(_script_path):
+        try:
+            with open(_script_path, "r", encoding="utf-8") as _f:
+                _code = _f.read()
+        finally:
+            try:
+                os.unlink(_script_path)
+            except OSError:
+                pass
+        exec(compile(_code, "<settings_window>", "exec"), {"__name__": "__main__"})
+    sys.exit(0)
+
+if _MODE == "download_model":
+    _prepend_bundle_path()
+    from voice_input.transcriber import download_model
+    download_model(os.environ.get("NEURADICTATE_MODEL", "small"))
+    sys.exit(0)
+
+if _MODE == "delete_model":
+    _prepend_bundle_path()
+    from voice_input.transcriber import delete_model
+    delete_model(os.environ.get("NEURADICTATE_MODEL", ""))
+    sys.exit(0)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Main mode — dependency check + run the app
+# ──────────────────────────────────────────────────────────────────────
 
 COMMON = [
     ("faster_whisper", "faster-whisper"),
@@ -27,6 +78,10 @@ WIN_ONLY = [
 
 
 def ensure_deps():
+    # Skip entirely in PyInstaller bundle — everything is pre-bundled
+    if getattr(sys, "frozen", False):
+        return
+
     deps = COMMON[:]
     if sys.platform == "darwin":
         deps += MAC_ONLY
@@ -45,7 +100,6 @@ def ensure_deps():
             print(f"Installing: {', '.join(missing)}...")
         except Exception:
             pass
-        # Try multiple install strategies for different Python setups
         attempts = [
             [sys.executable, "-m", "pip", "install", "--quiet", "--user"] + missing,
             [sys.executable, "-m", "pip", "install", "--quiet", "--break-system-packages"] + missing,
@@ -63,9 +117,11 @@ def ensure_deps():
 
 
 if __name__ == "__main__":
-    # --- Headless re-exec: detach from any visible terminal ---------------
     _HEADLESS = os.environ.get("NEURADICTATE_HEADLESS") == "1"
-    if not _HEADLESS and sys.platform == "darwin":
+    _FROZEN = getattr(sys, "frozen", False)
+
+    # Skip headless re-exec when frozen (PyInstaller bundle already has no console)
+    if not _FROZEN and not _HEADLESS and sys.platform == "darwin":
         if sys.stdout and sys.stdout.isatty():
             env = dict(os.environ, NEURADICTATE_HEADLESS="1")
             subprocess.Popen(
@@ -76,21 +132,25 @@ if __name__ == "__main__":
                 start_new_session=True,
                 env=env,
             )
-            # Close the Terminal/iTerm window that launched us
-            subprocess.Popen(["osascript", "-e",
-                'try\n'
-                '  tell application "Terminal"\n'
-                '    if it is frontmost then close front window\n'
-                '  end tell\n'
-                'end try\n'
-                'try\n'
-                '  tell application "iTerm2"\n'
-                '    if it is frontmost then tell current session of current window to close\n'
-                '  end tell\n'
-                'end try'],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                [
+                    "osascript", "-e",
+                    'try\n'
+                    '  tell application "Terminal"\n'
+                    '    if it is frontmost then close front window\n'
+                    '  end tell\n'
+                    'end try\n'
+                    'try\n'
+                    '  tell application "iTerm2"\n'
+                    '    if it is frontmost then tell current session of current window to close\n'
+                    '  end tell\n'
+                    'end try',
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             sys.exit(0)
-    elif not _HEADLESS and sys.platform == "win32":
+    elif not _FROZEN and not _HEADLESS and sys.platform == "win32":
         _exe = os.path.basename(sys.executable).lower()
         if _exe == "python.exe" and sys.stdout and sys.stdout.isatty():
             _dir = os.path.dirname(sys.executable)
@@ -109,7 +169,6 @@ if __name__ == "__main__":
             )
             sys.exit(0)
 
-    # Ensure stdout/stderr exist (pythonw sets them to None)
     if sys.stdout is None:
         sys.stdout = io.StringIO()
     if sys.stderr is None:
@@ -117,21 +176,38 @@ if __name__ == "__main__":
 
     try:
         ensure_deps()
+        # In bundle: make sure bundle path is importable
+        if _FROZEN:
+            _prepend_bundle_path()
         from voice_input.app import main
         main()
-    except Exception as e:
-        # Write error to a visible file so user can diagnose
-        err_path = os.path.join(os.path.dirname(__file__), "ERROR.txt")
-        with open(err_path, "w") as f:
-            import traceback
-            f.write(f"NeuraDictate failed to start:\n\n{traceback.format_exc()}\n")
-            f.write(f"\nPython: {sys.executable}\nPlatform: {sys.platform}\n")
-        # Also try a system notification on Windows
+    except Exception:
+        err_path = os.path.join(
+            os.path.expanduser("~/.cache/voice-input"), "ERROR.txt"
+        )
+        try:
+            os.makedirs(os.path.dirname(err_path), exist_ok=True)
+            with open(err_path, "w") as f:
+                import traceback
+                f.write(f"NeuraDictate failed to start:\n\n{traceback.format_exc()}\n")
+                f.write(f"\nPython: {sys.executable}\nPlatform: {sys.platform}\n")
+                f.write(f"Frozen: {_FROZEN}\n")
+        except OSError:
+            pass
         if sys.platform == "win32":
             try:
                 import ctypes
                 ctypes.windll.user32.MessageBoxW(
-                    0, f"NeuraDictate failed to start.\nSee ERROR.txt for details.",
-                    "NeuraDictate Error", 0x10)
+                    0, "NeuraDictate failed to start.\nSee ~/.cache/voice-input/ERROR.txt",
+                    "NeuraDictate Error", 0x10,
+                )
+            except Exception:
+                pass
+        elif sys.platform == "darwin":
+            try:
+                subprocess.Popen([
+                    "osascript", "-e",
+                    'display alert "NeuraDictate" message "Failed to start. See ~/.cache/voice-input/ERROR.txt"',
+                ])
             except Exception:
                 pass
