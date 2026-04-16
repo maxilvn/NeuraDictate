@@ -237,7 +237,9 @@ class VoiceInputApp:
         self._write_status(HudState.HIDDEN, "Settings saved")
 
     def _open_control_panel(self, blocking: bool = False) -> None:
-        if self._panel_open and not blocking:
+        # If a panel is already open, just focus it instead of opening a second
+        if SettingsWindow.is_open() and not blocking:
+            SettingsWindow.focus_existing()
             return
 
         def on_save(new_cfg: dict):

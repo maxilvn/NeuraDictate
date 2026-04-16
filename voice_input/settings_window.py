@@ -10,26 +10,57 @@ from . import config
 
 
 class SettingsWindow:
+    _current_proc = None  # class-level: track currently open panel subprocess
+
     def __init__(self, current_config: dict, on_save: Callable[[dict], None]):
         self._cfg = dict(current_config)
         self._on_save = on_save
 
+    @classmethod
+    def is_open(cls) -> bool:
+        """Check if a settings window subprocess is currently alive."""
+        return cls._current_proc is not None and cls._current_proc.poll() is None
+
+    @classmethod
+    def focus_existing(cls) -> None:
+        """Bring the existing panel to front (macOS)."""
+        if sys.platform == "darwin" and cls.is_open():
+            try:
+                subprocess.Popen(["osascript", "-e",
+                    'tell application "System Events" to set frontmost of '
+                    'the first process whose unix id is {} to true'.format(cls._current_proc.pid)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+
     def show(self, blocking: bool = False) -> None:
         """Launch control panel as a separate Python process."""
+        # If already open, just focus it
+        if SettingsWindow.is_open():
+            SettingsWindow.focus_existing()
+            return
+
         def _run():
             script = _build_settings_script(self._cfg)
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 [sys.executable, "-c", script],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
             )
-            if result.returncode == 0 and result.stdout.strip():
-                try:
-                    new_cfg = json.loads(result.stdout.strip())
-                    self._cfg.update(new_cfg)
-                    self._on_save(self._cfg)
-                except json.JSONDecodeError:
-                    pass
+            SettingsWindow._current_proc = proc
+            try:
+                stdout, _ = proc.communicate()
+                if proc.returncode == 0 and stdout.strip():
+                    try:
+                        new_cfg = json.loads(stdout.strip())
+                        self._cfg.update(new_cfg)
+                        self._on_save(self._cfg)
+                    except json.JSONDecodeError:
+                        pass
+            finally:
+                if SettingsWindow._current_proc is proc:
+                    SettingsWindow._current_proc = None
 
         if blocking:
             _run()
