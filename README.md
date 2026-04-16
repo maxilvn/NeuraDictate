@@ -6,14 +6,20 @@ Lokale Speech-to-Text Diktiersoftware von NEURA Robotics. Laeuft 100% auf deinem
 
 **Voraussetzung:** Python 3.10+ ([python.org](https://python.org) — bei Windows **"Add to PATH" anhaken!**)
 
-### Windows
+### Windows (1-Klick Installation)
 
-1. Python installieren: [python.org/downloads](https://python.org/downloads) → **"Add to PATH" anhaken**
-2. Projekt herunterladen:
-   - **Option A:** [ZIP herunterladen](https://github.com/maxilvn/NeuraDictate/archive/refs/heads/main.zip) und entpacken
-   - **Option B:** `git clone https://github.com/maxilvn/NeuraDictate.git`
-3. Doppelklick auf `VoiceInput-Windows.vbs` (oder `python start.py` im Terminal)
-4. Beim ersten Start werden automatisch alle Dependencies installiert und das Whisper-Model (466 MB) heruntergeladen
+1. **[ZIP herunterladen](https://github.com/maxilvn/NeuraDictate/archive/refs/heads/main.zip)** und entpacken
+2. **Doppelklick auf `install.bat`**
+
+Das war's. `install.bat` macht automatisch:
+- Installiert Python (falls nicht vorhanden) via winget
+- Installiert alle Dependencies
+- Laedt das Whisper-Model (466 MB) herunter
+- Erstellt Desktop-Verknuepfung
+- Richtet Autostart ein
+- Startet NeuraDictate
+
+Beim ersten Start fragt Windows evtl. nach Berechtigung fuer den Keyboard-Listener — bestaetigen.
 
 ### macOS
 
