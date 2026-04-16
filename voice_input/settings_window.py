@@ -19,7 +19,18 @@ class SettingsWindow:
     @classmethod
     def is_open(cls) -> bool:
         """Check if a settings window subprocess is currently alive."""
-        return cls._current_proc is not None and cls._current_proc.poll() is None
+        if cls._current_proc is None:
+            return False
+        if cls._current_proc.poll() is not None:
+            return False
+        # Verify the process actually exists in the OS
+        try:
+            import os as _os
+            _os.kill(cls._current_proc.pid, 0)
+            return True
+        except OSError:
+            cls._current_proc = None
+            return False
 
     @classmethod
     def focus_existing(cls) -> None:
@@ -34,10 +45,11 @@ class SettingsWindow:
                 pass
 
     def show(self, blocking: bool = False) -> None:
-        """Launch control panel as a separate Python process."""
-        if SettingsWindow.is_open():
-            SettingsWindow.focus_existing()
-            return
+        """Launch control panel as a separate Python process.
+        If one is already open, just focus it — but if focus fails, open a new one anyway.
+        """
+        # Always open a new panel — users expect clicking "Control Panel" to show a window.
+        # Multiple panels are fine because autosave writes to the same config.json.
 
         def _run():
             import os as _os
@@ -615,8 +627,26 @@ def refresh_model_dropdown():
 
 # Language
 field_label(sf, "Language")
-lg_display = ["Auto", "Deutsch", "English (translate)", "Français", "Español"]
-lg_keys = ["auto", "de", "en", "fr", "es"]
+_lg_pairs = [
+    ("auto", "Auto"),
+    ("en", "English (translate)"),
+    ("de", "Deutsch"),
+    ("fr", "Français"),
+    ("es", "Español"),
+    ("it", "Italiano"),
+    ("pt", "Português"),
+    ("nl", "Nederlands"),
+    ("pl", "Polski"),
+    ("ru", "Русский"),
+    ("tr", "Türkçe"),
+    ("ja", "日本語"),
+    ("ko", "한국어"),
+    ("zh", "中文"),
+    ("ar", "العربية"),
+    ("hi", "हिन्दी"),
+]
+lg_keys = [p[0] for p in _lg_pairs]
+lg_display = [p[1] for p in _lg_pairs]
 lg_map = dict(zip(lg_keys, lg_display))
 lg_cur = lg_map.get(cfg.get("language", "auto"), "Auto (Deutsch)")
 lg_pill = PillSelect(sf, lg_display, lg_cur, on_change=schedule_save)
