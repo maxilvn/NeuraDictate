@@ -78,16 +78,23 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
 </plist>
 PLIST
 
-# Launcher - runs code from INSIDE the bundle
-cat > "$APP/Contents/MacOS/NeuraDictate" << 'LAUNCHER'
+# Get absolute path to the Python that has our dependencies installed
+PYTHON_PATH="$(command -v python3)"
+echo "  [+] Python Pfad: $PYTHON_PATH"
+
+# Launcher - uses the exact Python that was used during install
+cat > "$APP/Contents/MacOS/NeuraDictate" << LAUNCHER
 #!/bin/zsh
-# Self-contained launcher - runs app from inside the bundle
-BUNDLE_DIR="$(cd "$(dirname "$0")/../Resources/app" && pwd -P)"
-cd "$BUNDLE_DIR"
+BUNDLE_DIR="\$(cd "\$(dirname "\$0")/../Resources/app" && pwd -P)"
+cd "\$BUNDLE_DIR"
 export NEURADICTATE_HEADLESS=1
-exec /usr/bin/env python3 start.py
+# Log any startup errors so user can diagnose
+exec "$PYTHON_PATH" start.py >> "\$HOME/.cache/voice-input/app-launch.log" 2>&1
 LAUNCHER
 chmod +x "$APP/Contents/MacOS/NeuraDictate"
+
+# Ensure log dir exists
+mkdir -p "$HOME/.cache/voice-input"
 
 echo "  [+] NeuraDictate.app in /Applications installiert"
 

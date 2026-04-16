@@ -3,3 +3,10 @@ __pycache__/
 .DS_Store
 ERROR.txt
 docs/superpowers/
+
+# Build artifacts
+NeuraDictate.dmg
+NeuraDictate-Windows.zip
+NeuraDictate.app/
+icon.ico
+/tmp/
