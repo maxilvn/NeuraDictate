@@ -54,6 +54,7 @@ def _build_settings_script(cfg: dict) -> str:
     project_dir_json = json.dumps(str(config.MODULE_DIR))
     config_path_json = json.dumps(str(config.CONFIG_PATH))
     logo_path_json = json.dumps(str(config.MODULE_DIR.parent / "logo.png"))
+    pid_path_json = json.dumps(str(config.PID_PATH))
 
     return textwrap.dedent(
         f"""\
@@ -75,6 +76,7 @@ model_dir = pathlib.Path(json.loads({model_dir_json!r}))
 project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 config_path = pathlib.Path(json.loads({config_path_json!r}))
 logo_path = pathlib.Path(json.loads({logo_path_json!r}))
+pid_path = pathlib.Path(json.loads({pid_path_json!r}))
 
 # ── Light palette ──
 BG      = "#FFFFFF"
@@ -763,13 +765,17 @@ def refresh(sched=True):
     else:
         lbl, dot = detail or "Ready", FG2
 
-    # Check if backend is running (status updated within last 10s)
-    import time as _time
+    # Check if backend is running via PID file (process actually alive)
+    import os as _os
     backend_alive = False
     try:
-        if status_path.exists():
-            age = _time.time() - status_path.stat().st_mtime
-            backend_alive = age < 10
+        if pid_path.exists():
+            pid = int(pid_path.read_text(encoding="utf-8").strip())
+            try:
+                _os.kill(pid, 0)  # signal 0 = check if alive
+                backend_alive = True
+            except OSError:
+                backend_alive = False
     except Exception:
         pass
 
