@@ -158,6 +158,15 @@ FONT = "SF Pro Text" if is_mac else "Segoe UI"
 MONO = "SF Mono" if is_mac else "Consolas"
 RAD  = 10  # corner radius
 
+if is_mac:
+    # Hide from Dock — this is a settings panel, not a full app
+    try:
+        import AppKit as _AppKit
+        _AppKit.NSApplication.sharedApplication().setActivationPolicy_(
+            _AppKit.NSApplicationActivationPolicyAccessory)
+    except Exception:
+        pass
+
 root = tk.Tk()
 root.title(app_name)
 root.configure(bg=BG)
