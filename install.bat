@@ -62,22 +62,51 @@ python -c "import sys; sys.path.insert(0, '.'); from voice_input.transcriber imp
 echo  [+] Model heruntergeladen
 
 echo.
-echo  [3/4] Erstelle Desktop-Shortcut...
+echo  [3/4] Erstelle Verknuepfungen (Desktop + Startmenue)...
 set "PROJ_DIR=%~dp0"
 set "PROJ_DIR=%PROJ_DIR:~0,-1%"
-set "SHORTCUT=%USERPROFILE%\Desktop\NeuraDictate.lnk"
+set "DESKTOP=%USERPROFILE%\Desktop\NeuraDictate.lnk"
+set "STARTMENU=%APPDATA%\Microsoft\Windows\Start Menu\Programs\NeuraDictate.lnk"
 
+:: Convert PNG icon to ICO for Windows shortcut
 powershell -NoProfile -Command ^
-  "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%SHORTCUT%'); ^
+  "Add-Type -AssemblyName System.Drawing; ^
+   $img = [System.Drawing.Image]::FromFile('%PROJ_DIR%\icon.png'); ^
+   $ico = New-Object System.IO.FileStream('%PROJ_DIR%\icon.ico', [System.IO.FileMode]::Create); ^
+   $bmp = New-Object System.Drawing.Bitmap($img, 64, 64); ^
+   $hicon = $bmp.GetHicon(); ^
+   $icon = [System.Drawing.Icon]::FromHandle($hicon); ^
+   $icon.Save($ico); ^
+   $ico.Close(); $bmp.Dispose(); $img.Dispose()" 2>nul
+
+:: Desktop shortcut
+powershell -NoProfile -Command ^
+  "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%DESKTOP%'); ^
    $s.TargetPath = '%PROJ_DIR%\VoiceInput-Windows.vbs'; ^
    $s.WorkingDirectory = '%PROJ_DIR%'; ^
+   $s.IconLocation = '%PROJ_DIR%\icon.ico'; ^
+   $s.Description = 'NeuraDictate - Local Speech-to-Text'; ^
    $s.Save()"
-echo  [+] Desktop-Shortcut erstellt
+
+:: Start Menu shortcut
+powershell -NoProfile -Command ^
+  "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTMENU%'); ^
+   $s.TargetPath = '%PROJ_DIR%\VoiceInput-Windows.vbs'; ^
+   $s.WorkingDirectory = '%PROJ_DIR%'; ^
+   $s.IconLocation = '%PROJ_DIR%\icon.ico'; ^
+   $s.Description = 'NeuraDictate - Local Speech-to-Text'; ^
+   $s.Save()"
+echo  [+] Verknuepfungen erstellt (Desktop + Startmenue)
 
 echo.
 echo  [4/4] Autostart einrichten...
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-copy /Y "%PROJ_DIR%\VoiceInput-Windows.vbs" "%STARTUP%\NeuraDictate.vbs" >nul
+powershell -NoProfile -Command ^
+  "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP%\NeuraDictate.lnk'); ^
+   $s.TargetPath = '%PROJ_DIR%\VoiceInput-Windows.vbs'; ^
+   $s.WorkingDirectory = '%PROJ_DIR%'; ^
+   $s.IconLocation = '%PROJ_DIR%\icon.ico'; ^
+   $s.Save()"
 echo  [+] App startet automatisch bei Windows-Login
 
 echo.

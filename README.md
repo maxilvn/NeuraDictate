@@ -21,15 +21,21 @@ Das war's. `install.bat` macht automatisch:
 
 Beim ersten Start fragt Windows evtl. nach Berechtigung fuer den Keyboard-Listener — bestaetigen.
 
-### macOS
+### macOS (1-Klick Installation)
 
-```bash
-git clone https://github.com/maxilvn/NeuraDictate.git
-cd NeuraDictate
-python3 start.py
-```
+1. **[ZIP herunterladen](https://github.com/maxilvn/NeuraDictate/archive/refs/heads/main.zip)** und entpacken
+2. **Doppelklick auf `install-mac.command`**
 
-macOS fragt nach **Accessibility-Berechtigung** (Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen).
+Das Script:
+- Installiert alle Dependencies
+- Laedt das Whisper-Model (466 MB) herunter
+- Installiert `NeuraDictate.app` nach `/Applications`
+- Richtet Autostart ein (LaunchAgent)
+- Startet die App
+
+macOS fragt beim ersten Start nach **Accessibility-Berechtigung** (Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen) — das ist fuer den globalen Hotkey noetig.
+
+Die App erscheint danach im Launchpad und /Applications wie jede andere App.
 
 ## Benutzung
 
