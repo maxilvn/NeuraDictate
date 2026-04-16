@@ -31,20 +31,35 @@ class _MacTray:
     def run(self) -> None:
         import rumps
 
-        @rumps.clicked("Pause / Resume")
-        def toggle(_):
-            self._on_toggle()
+        # Bind callbacks via MenuItem objects — more reliable than @rumps.clicked
+        # decorators which require the method to be on the App subclass.
+        def _toggle(_):
+            try:
+                self._on_toggle()
+            except Exception:
+                import traceback
+                traceback.print_exc()
 
-        @rumps.clicked("Control Panel")
-        def settings(_):
-            self._on_settings()
+        def _settings(_):
+            try:
+                self._on_settings()
+            except Exception:
+                import traceback
+                traceback.print_exc()
 
-        @rumps.clicked("Quit")
-        def quit_app(_):
-            self._on_quit()
+        def _quit_app(_):
+            try:
+                self._on_quit()
+            except Exception:
+                pass
             rumps.quit_application()
 
-        self._app.menu = ["Pause / Resume", "Control Panel", None, "Quit"]
+        self._app.menu = [
+            rumps.MenuItem("Pause / Resume", callback=_toggle),
+            rumps.MenuItem("Control Panel", callback=_settings),
+            None,
+            rumps.MenuItem("Quit", callback=_quit_app),
+        ]
 
         # Install reopen-event handler so dock/Finder clicks open settings
         self._install_reopen_handler()
