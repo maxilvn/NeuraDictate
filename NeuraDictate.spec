@@ -2,7 +2,7 @@
 # PyInstaller spec file for NeuraDictate
 
 import sys
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_all
 
 block_cipher = None
 
@@ -29,16 +29,24 @@ hidden = [
     'tkinter.scrolledtext',
 ]
 
-# faster-whisper needs ctranslate2 and tokenizers — collect submodules
-hidden += collect_submodules('faster_whisper')
-hidden += collect_submodules('ctranslate2')
-hidden += collect_submodules('tokenizers')
-hidden += collect_submodules('huggingface_hub')
-
 datas = [
     ('icon.png', '.'),
     ('logo.png', '.'),
 ]
+
+# Collect EVERYTHING for critical packages (modules + data + binaries)
+binaries = []
+for pkg in ['faster_whisper', 'ctranslate2', 'tokenizers', 'huggingface_hub']:
+    try:
+        _d, _b, _h = collect_all(pkg)
+        datas += _d
+        binaries += _b
+        hidden += _h
+    except Exception:
+        pass
+
+# Also collect voice_input submodules (ensure they're all picked up)
+hidden += collect_submodules('voice_input')
 
 # Platform-specific hidden imports
 if sys.platform == 'darwin':
@@ -50,18 +58,19 @@ if sys.platform == 'darwin':
     hidden += collect_submodules('Quartz')
     hidden += collect_submodules('AppKit')
 elif sys.platform == 'win32':
-    hidden += [
-        'pynput', 'pynput.keyboard', 'pynput.mouse',
-        'pystray', 'PIL', 'PIL.Image', 'PIL.ImageDraw',
-        'pyperclip', 'pyautogui',
-    ]
-    hidden += collect_submodules('pynput')
-    hidden += collect_submodules('pystray')
+    for pkg in ['pynput', 'pystray', 'PIL', 'pyperclip', 'pyautogui']:
+        try:
+            _d, _b, _h = collect_all(pkg)
+            datas += _d
+            binaries += _b
+            hidden += _h
+        except Exception:
+            pass
 
 a = Analysis(
     ['start.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hidden,
     hookspath=[],

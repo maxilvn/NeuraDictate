@@ -34,6 +34,25 @@ jobs:
       - name: Build with PyInstaller
         run: python -m PyInstaller NeuraDictate.spec --clean --noconfirm
 
+      - name: Smoke test — verify modules import inside bundle
+        shell: pwsh
+        run: |
+          # Run bundle briefly with a mode that only imports and exits
+          $env:NEURADICTATE_MODE = "download_model"
+          $env:NEURADICTATE_MODEL = "__test_nonexistent__"
+          $proc = Start-Process -FilePath "dist\NeuraDictate\NeuraDictate.exe" -PassThru -NoNewWindow -RedirectStandardError "stderr.log" -RedirectStandardOutput "stdout.log"
+          Start-Sleep -Seconds 15
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          Write-Host "=== stdout ==="
+          if (Test-Path stdout.log) { Get-Content stdout.log }
+          Write-Host "=== stderr ==="
+          if (Test-Path stderr.log) { Get-Content stderr.log }
+          # If the import failed with ModuleNotFoundError, fail the build
+          if ((Test-Path stderr.log) -and ((Get-Content stderr.log -Raw) -match "ModuleNotFoundError|ImportError")) {
+            Write-Error "Bundle has import errors"
+            exit 1
+          }
+
       - name: Create ZIP archive
         shell: pwsh
         run: |
