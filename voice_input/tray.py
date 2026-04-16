@@ -63,6 +63,16 @@ class _MacTray:
         # Install reopen-event handler so dock/Finder clicks open settings
         self._install_reopen_handler()
 
+        # Hide Dock icon — must happen AFTER rumps sets up its NSApp delegate,
+        # but BEFORE the run loop starts. Doing it earlier breaks the HUD's
+        # NSPanel ordering in an accessory app.
+        try:
+            import AppKit
+            AppKit.NSApp.setActivationPolicy_(
+                AppKit.NSApplicationActivationPolicyAccessory)
+        except Exception:
+            pass
+
         self._app.run()
 
     def _install_reopen_handler(self):

@@ -35,8 +35,8 @@ class VoiceInputApp:
         self._cfg = config.load()
         self._recorder = Recorder()
         self._hud = HudOverlay()
-        self._hotkey: HotkeyListener | None = None
-        self._tray: TrayApp | None = None
+        self._hotkey = None
+        self._tray = None
         self._active = True
         self._transcribing = False
         self._cancel_transcription = False

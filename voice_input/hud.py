@@ -54,7 +54,7 @@ class HudOverlay:
             self._impl = _TkHud()
         self._impl.start()
 
-    def show(self, state: str, message: str | None = None) -> None:
+    def show(self, state, message=None):
         if self._impl:
             self._impl.show(state, message)
 
@@ -156,7 +156,7 @@ class _MacHud:
         content.addSubview_(self._dot_label)
         content.addSubview_(self._label)
 
-    def show(self, state: str, message: str | None = None) -> None:
+    def show(self, state, message=None):
         import AppKit
 
         def _do_show():
@@ -369,7 +369,7 @@ class _TkHud:
         self._ready.set()
         self._root.mainloop()
 
-    def show(self, state: str, message: str | None = None) -> None:
+    def show(self, state, message=None):
         if self._root is None:
             return
 

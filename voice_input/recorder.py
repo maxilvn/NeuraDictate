@@ -18,7 +18,7 @@ MIN_RECORDING_BYTES = 8000
 class Recorder:
     def __init__(self):
         self._frames: list[np.ndarray] = []
-        self._stream: sd.InputStream | None = None
+        self._stream = None
         self._lock = threading.Lock()
         self._recording = False
 
@@ -40,7 +40,7 @@ class Recorder:
             self._stream.start()
             self._recording = True
 
-    def stop(self) -> str | None:
+    def stop(self):
         """Stop recording and save WAV. Returns file path or None if too short."""
         with self._lock:
             if not self._recording:

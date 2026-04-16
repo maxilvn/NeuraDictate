@@ -1,12 +1,15 @@
 """Lightweight control panel window running in a separate Python process."""
 
 import json
+import logging
 import subprocess
 import sys
 import textwrap
 from typing import Callable
 
 from . import config
+
+log = logging.getLogger(__name__)
 
 
 class SettingsWindow:
@@ -67,8 +70,15 @@ class SettingsWindow:
                             NEURADICTATE_SCRIPT=tmp.name)
                 # Clear any headless flag so subprocess doesn't re-exec itself
                 env.pop("NEURADICTATE_HEADLESS", None)
+                # When frozen (PyInstaller), sys.executable is the bundle entry
+                # point. Otherwise we must pass start.py explicitly.
+                if getattr(sys, "frozen", False):
+                    argv = [sys.executable]
+                else:
+                    start_py = str(config.MODULE_DIR.parent / "start.py")
+                    argv = [sys.executable, start_py]
                 proc = subprocess.Popen(
-                    [sys.executable],
+                    argv,
                     env=env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -77,6 +87,8 @@ class SettingsWindow:
                 SettingsWindow._current_proc = proc
                 try:
                     stdout, _err = proc.communicate()
+                    if proc.returncode != 0 and _err:
+                        log.warning("Settings subprocess exited rc=%s: %s", proc.returncode, _err[:500])
                     if proc.returncode == 0 and stdout.strip():
                         try:
                             new_cfg = json.loads(stdout.strip())
@@ -88,6 +100,7 @@ class SettingsWindow:
                     if SettingsWindow._current_proc is proc:
                         SettingsWindow._current_proc = None
             except Exception:
+                log.exception("Settings subprocess failed")
                 try:
                     _os.unlink(tmp.name)
                 except OSError:
@@ -158,17 +171,19 @@ FONT = "SF Pro Text" if is_mac else "Segoe UI"
 MONO = "SF Mono" if is_mac else "Consolas"
 RAD  = 10  # corner radius
 
+root = tk.Tk()
+root.title(app_name)
+
 if is_mac:
-    # Hide from Dock — this is a settings panel, not a full app
+    # Hide from Dock — must come AFTER tk.Tk() so Tk's own TKApplication
+    # subclass (which implements macOSVersion) is the sharedApplication.
+    # Creating NSApplication before Tk crashes Tk 9.0 on macOS 15+.
     try:
         import AppKit as _AppKit
         _AppKit.NSApplication.sharedApplication().setActivationPolicy_(
             _AppKit.NSApplicationActivationPolicyAccessory)
     except Exception:
         pass
-
-root = tk.Tk()
-root.title(app_name)
 root.configure(bg=BG)
 root.resizable(True, True)
 root.minsize(480, 540)
@@ -288,7 +303,7 @@ tk.Label(header, text="Dictate", font=(FONT, 14), bg=BG, fg=FG).pack(
 tab_bar = tk.Frame(root, bg=BG)
 tab_bar.pack(fill="x", padx=20, pady=(12, 0))
 
-current_tab = tk.StringVar(value="settings")
+current_tab = tk.StringVar(value="history")
 tab_frames = {{}}
 tab_canvases = {{}}
 TAB_W, TAB_H = 100, 32
@@ -310,7 +325,7 @@ def switch_tab(name):
     if name == "settings":
         refresh_model_dropdown()
 
-for tname in ["settings", "history", "models"]:
+for tname in ["history", "settings", "models"]:
     c = tk.Canvas(tab_bar, width=TAB_W, height=TAB_H, bg=BG, highlightthickness=0, bd=0, cursor="")
     c.pack(side="left", padx=(0, 4))
     c.bind("<Button-1>", lambda e, n=tname: switch_tab(n))
@@ -727,7 +742,8 @@ def build_models():
                                 NEURADICTATE_MODE="delete_model",
                                 NEURADICTATE_MODEL=m)
                     _env.pop("NEURADICTATE_HEADLESS", None)
-                    subprocess.Popen([sys.executable], env=_env,
+                    _argv = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(project_dir.parent / "start.py")]
+                    subprocess.Popen(_argv, env=_env,
                                       stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL)
                     root.after(600, build_models)
@@ -745,7 +761,8 @@ def build_models():
                                     NEURADICTATE_MODE="download_model",
                                     NEURADICTATE_MODEL=m)
                         _env.pop("NEURADICTATE_HEADLESS", None)
-                        subprocess.run([sys.executable], env=_env,
+                        _argv = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, str(project_dir.parent / "start.py")]
+                        subprocess.run(_argv, env=_env,
                                         stdout=subprocess.DEVNULL,
                                         stderr=subprocess.DEVNULL)
                         root.after(0, build_models)
@@ -912,7 +929,7 @@ def refresh(sched=True):
 
 # ── Init ──
 _init[0] = True
-switch_tab("settings")
+switch_tab("history")
 refresh()
 root.mainloop()
 """
