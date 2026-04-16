@@ -55,7 +55,6 @@ class _MacTray:
             rumps.quit_application()
 
         self._app.menu = [
-            rumps.MenuItem("Pause / Resume", callback=_toggle),
             rumps.MenuItem("Control Panel", callback=_settings),
             None,
             rumps.MenuItem("Quit", callback=_quit_app),
