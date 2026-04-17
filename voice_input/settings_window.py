@@ -99,6 +99,9 @@ class SettingsWindow:
                 finally:
                     if SettingsWindow._current_proc is proc:
                         SettingsWindow._current_proc = None
+                    # Settings window closed → quit the whole app
+                    log.info("Settings window closed, quitting app")
+                    _os._exit(0)
             except Exception:
                 log.exception("Settings subprocess failed")
                 try:
@@ -131,6 +134,7 @@ def _build_settings_script(cfg: dict) -> str:
     config_path_json = json.dumps(str(config.CONFIG_PATH))
     logo_path_json = json.dumps(str(config.MODULE_DIR.parent / "logo.png"))
     pid_path_json = json.dumps(str(config.PID_PATH))
+    cache_dir_json = json.dumps(str(config.CACHE_DIR))
 
     return textwrap.dedent(
         f"""\
@@ -153,6 +157,7 @@ project_dir = pathlib.Path(json.loads({project_dir_json!r}))
 config_path = pathlib.Path(json.loads({config_path_json!r}))
 logo_path = pathlib.Path(json.loads({logo_path_json!r}))
 pid_path = pathlib.Path(json.loads({pid_path_json!r}))
+cache_dir = pathlib.Path(json.loads({cache_dir_json!r}))
 
 # ── Light palette ──
 BG      = "#FFFFFF"
@@ -682,10 +687,21 @@ paste_toggle = Toggle(sf, "Auto-paste after transcription",
                        cfg.get("auto_paste", True), on_change=schedule_save)
 paste_toggle.pack(anchor="w", padx=20, pady=6)
 
-# Output config on window close
+# Output config on window close — also quit the backend so everything stops together
 def on_close():
     result = build_cfg()
     print(json.dumps(result))
+    # Kill the backend directly so closing the panel = quitting the whole app
+    try:
+        import os, signal
+        pid = int(pid_path.read_text().strip())
+        os.kill(pid, signal.SIGTERM)
+    except Exception:
+        # Fallback: signal file
+        try:
+            (cache_dir / "quit_app").write_text("1")
+        except Exception:
+            pass
     root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", on_close)

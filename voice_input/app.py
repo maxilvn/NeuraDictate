@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import signal
 import sys
 import threading
 from datetime import datetime
@@ -55,6 +56,9 @@ class VoiceInputApp:
 
         log.info("%s starting...", config.APP_NAME)
         self._write_status(HudState.HIDDEN, "Starting")
+
+        # SIGTERM from settings window close → exit immediately
+        signal.signal(signal.SIGTERM, lambda *_: os._exit(0))
 
         # Clear transcript history for fresh session
         try:
@@ -197,12 +201,27 @@ class VoiceInputApp:
         except OSError:
             pass
 
+        # Clean up any stale signal files from previous run
+        for stale in ("quit_app", "open_panel"):
+            try:
+                (config.CACHE_DIR / stale).unlink()
+            except (OSError, FileNotFoundError):
+                pass
+
         def watch():
             signal_path = config.CACHE_DIR / "open_panel"
+            quit_signal_path = config.CACHE_DIR / "quit_app"
             while True:
                 import time
-                time.sleep(2)
+                time.sleep(1)
                 try:
+                    # Check if settings panel requested a full quit
+                    if quit_signal_path.exists():
+                        quit_signal_path.unlink()
+                        log.info("Quit signal received from settings panel")
+                        self._release_single_instance()
+                        self._write_status(HudState.HIDDEN, "Quitting")
+                        os._exit(0)
                     # Check if another instance wants us to open the panel
                     if signal_path.exists():
                         signal_path.unlink()
@@ -261,6 +280,8 @@ class VoiceInputApp:
         if self._tray:
             self._tray.stop()
         self._release_single_instance()
+        # Force exit to ensure all threads (transcription, etc.) stop immediately
+        threading.Timer(1.0, lambda: os._exit(0)).start()
 
     def _acquire_single_instance(self) -> bool:
         current_pid = os.getpid()
